@@ -15,12 +15,13 @@
     if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
   } catch (e) {}
 })();
-/* Police : dans l'app bureau, Inter est livrée avec l'app (instantanée, hors ligne) ;
-   sur le web, elle vient de Google Fonts. En attendant, « Inter Fallback » (Arial
+/* Police : Inter est livrée avec Verbe (dossier fonts/) — dans l'app bureau et sur un site qui
+   héberge Verbe, elle est instantanée et ne passe pas par Google ; un fichier ouvert seul
+   (sans son dossier fonts/) la prend chez Google Fonts. En attendant, « Inter Fallback » (Arial
    ajustée aux mesures d'Inter) évite que le texte saute quand Inter arrive. */
 (function () {
   var h = document.head;
-  if (window.verbeDesktop) {
+  if (window.verbeDesktop || location.protocol !== 'file:') {
     var s = document.createElement('style');
     s.textContent = "@font-face{font-family:'Inter';font-style:normal;font-weight:400 900;font-display:block;src:url('fonts/inter-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}"
       + "@font-face{font-family:'Inter';font-style:normal;font-weight:400 900;font-display:block;src:url('fonts/inter-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}";
@@ -709,7 +710,8 @@ html.bulle body > :not(#island) { display: none !important; }
   --w: 420px; --h: 76px;
   width: var(--w); height: var(--h); border-radius: calc(var(--h) / 2); padding: 0 16px;
   border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 18px 44px rgba(20,10,4,.42), 0 3px 10px rgba(20,10,4,.25), inset 0 1px 0 rgba(255,255,255,.08);
+  /* ombre contenue dans la fenêtre transparente (520 × 190) : jamais coupée net sur le bureau */
+  box-shadow: 0 10px 28px rgba(20,10,4,.38), 0 2px 8px rgba(20,10,4,.22), inset 0 1px 0 rgba(255,255,255,.08);
   opacity: 0; transform: scale(.72);
   transition: width .45s var(--spring), height .45s var(--spring), border-radius .45s var(--spring), transform .4s var(--spring), opacity .2s ease;
 }
@@ -926,7 +928,7 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="clean-label" aria-describedby="clean-help" data-switch="autoClean"></button></div>
             </div>
             <div class="srow desk-only">
-              <div class="srow-t"><span class="flabel" id="paste-label">Coller automatiquement</span><p class="help">Le texte arrive tout seul là où tu écrivais.</p></div>
+              <div class="srow-t"><span class="flabel" id="paste-label">Coller automatiquement</span><p class="help">Le texte arrive tout seul là où tu écrivais, puis ce que tu avais copié revient dans le presse-papiers.</p></div>
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="paste-label" data-switch="autoPaste"></button></div>
             </div>
             <div class="srow web-only">
@@ -997,7 +999,7 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v0.4.4</p>
+          <p class="foot">Verbe v0.4.5</p>
         </section>
 
       </div>

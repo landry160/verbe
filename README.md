@@ -1,6 +1,16 @@
 # Verbe : dictée vocale
 
-Parle, c'est écrit, puis collé là où tu écris. Voir aussi `VISION.md`.
+Parle, c'est écrit, puis collé là où tu écris.
+
+![La bulle de Verbe écoute, en bas de l'écran, pendant qu'un courriel s'écrit](docs/verbe-bulle.webp)
+
+- **Essayer dans le navigateur :** https://landry160.github.io/verbe/
+- **Télécharger pour Windows :** [Verbe-Setup.exe](https://github.com/landry160/verbe/releases/latest/download/Verbe-Setup.exe)
+  (installateur pas encore signé : si Windows avertit, « Informations complémentaires » puis « Exécuter quand même »)
+
+![Pendant l'écoute : la voix en barres et le temps écoulé](docs/verbe-dicter.webp)
+
+Voir aussi `VISION.md` : ce que Verbe veut être, et ce qui ne doit pas changer.
 
 ## Deux façons de l'utiliser
 

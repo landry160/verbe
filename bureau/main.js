@@ -5,14 +5,13 @@
 // - la fenêtre principale (Dicter, Historique, Réglages) se range près de l'horloge.
 const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, Tray, Menu, nativeImage, session, shell } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const PAGE = path.join(ROOT, 'app', 'verbe.html');
 const ICON = path.join(__dirname, 'icone.png');
 const HIDDEN_START = process.argv.includes('--cache');
-/* fenêtre transparente un peu plus grande que la pastille (440 × 92 au plus), pour son ombre */
-const BUBBLE_W = 480, BUBBLE_H = 150;
+/* fenêtre transparente plus grande que la pastille (440 × 92 au plus) : son ombre tient dedans */
+const BUBBLE_W = 520, BUBBLE_H = 190;
 
 /* tests : un profil à part (--profil=dossier) pour ne jamais toucher les vrais réglages */
 const profil = process.argv.find(a => a.startsWith('--profil='));
@@ -25,54 +24,59 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let main = null, bubble = null, tray = null, quitting = false;
 let accel = null, bubbleState = 'idle', escOn = false;
 
-/* ---------- Collage : un petit PowerShell resté ouvert, qui tape Ctrl+V ---------- */
-let keyer = null;
-function startKeyer() {
-  if (process.platform !== 'win32') return;
-  const script = [
-    "$ErrorActionPreference = 'SilentlyContinue'",
-    "Add-Type -Namespace Verbe -Name Keys -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void keybd_event(byte vk, byte scan, uint flags, System.UIntPtr extra);'",
-    'while ($true) {',
-    '  $l = [Console]::In.ReadLine()',
-    '  if ($l -eq $null) { break }',
-    "  if ($l -eq 'paste') {",
-    // Maj encore enfoncée ferait Ctrl+Maj+V : on la relâche d'abord
-    '    [Verbe.Keys]::keybd_event(0x10, 0, 2, [System.UIntPtr]::Zero)',
-    '    [Verbe.Keys]::keybd_event(0x11, 0, 0, [System.UIntPtr]::Zero)',
-    '    [Verbe.Keys]::keybd_event(0x56, 0, 0, [System.UIntPtr]::Zero)',
-    '    [Verbe.Keys]::keybd_event(0x56, 0, 2, [System.UIntPtr]::Zero)',
-    '    [Verbe.Keys]::keybd_event(0x11, 0, 2, [System.UIntPtr]::Zero)',
-    "    [Console]::Out.WriteLine('ok')",
-    '  }',
-    // vérification sans rien taper : prouve que le module clavier est chargé
-    "  if ($l -eq 'ping') { if ('Verbe.Keys' -as [type]) { [Console]::Out.WriteLine('pong') } else { [Console]::Out.WriteLine('nokeys') } }",
-    '}',
-  ].join('\n');
-  /* le script passe en -EncodedCommand : l'entrée standard reste libre pour nos ordres */
-  const encoded = Buffer.from(script, 'utf16le').toString('base64');
-  keyer = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
-  keyer.on('exit', () => { keyer = null; if (!quitting) setTimeout(startKeyer, 1000); });
+/* ---------- Collage : Windows tape Ctrl+V pour nous (SendInput, via koffi) ----------
+   Un appel direct à user32.dll : pas de PowerShell, rien que les antivirus puissent confondre
+   avec un script caché. SendInput remplace keybd_event, que Microsoft considère comme dépassée. */
+let SendInput = null, INPUT = null;
+function loadKeyboard() {
+  if (process.platform !== 'win32' || SendInput) return;
+  try {
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll');
+    const MOUSEINPUT = koffi.struct('MOUSEINPUT', { dx: 'long', dy: 'long', mouseData: 'uint32', dwFlags: 'uint32', time: 'uint32', dwExtraInfo: 'uintptr' });
+    const KEYBDINPUT = koffi.struct('KEYBDINPUT', { wVk: 'uint16', wScan: 'uint16', dwFlags: 'uint32', time: 'uint32', dwExtraInfo: 'uintptr' });
+    const HARDWAREINPUT = koffi.struct('HARDWAREINPUT', { uMsg: 'uint32', wParamL: 'uint16', wParamH: 'uint16' });
+    INPUT = koffi.struct('INPUT', { type: 'uint32', u: koffi.union('INPUT_U', { mi: MOUSEINPUT, ki: KEYBDINPUT, hi: HARDWAREINPUT }) });
+    SendInput = user32.func('uint32 __stdcall SendInput(uint32 cInputs, _In_ INPUT *pInputs, int cbSize)');
+  } catch (e) { console.error('[Verbe] clavier Windows indisponible :', e.message); SendInput = null; }
 }
+const KEYUP = 0x0002;
+function key(vk, up) { return SendInput(1, { type: 1, u: { ki: { wVk: vk, wScan: 0, dwFlags: up ? KEYUP : 0, time: 0, dwExtraInfo: 0 } } }, require('koffi').sizeof(INPUT)) === 1; }
 function sendPaste() {
-  return new Promise(resolve => {
-    if (!keyer) return resolve(false);
-    const t = setTimeout(() => { keyer?.stdout.off('data', onData); resolve(false); }, 1500);
-    const onData = d => { if (String(d).includes('ok')) { clearTimeout(t); keyer.stdout.off('data', onData); resolve(true); } };
-    keyer.stdout.on('data', onData);
-    keyer.stdin.write('paste\n');
-  });
+  loadKeyboard();
+  if (!SendInput) return false;
+  /* Maj encore enfoncée ferait Ctrl+Maj+V (collage sans mise en forme) : on la relâche d'abord */
+  key(0x10, true);
+  return key(0x11, false) && key(0x56, false) && key(0x56, true) && key(0x11, true);
 }
+/* vérification sans rien taper : relâcher Maj (qui n'est pas enfoncée) ne fait rien, mais prouve que Windows répond */
+function pingKeyboard() { loadKeyboard(); return SendInput && key(0x10, true) ? 'pong' : 'absent'; }
+global.verbePingKeyer = async () => pingKeyboard(); /* pour les tests */
+global.verbeClipboard = { save: () => saveClipboard(), restore: t => restoreClipboard(t) }; /* pour les tests */
 
-function pingKeyer() {
-  return new Promise(resolve => {
-    if (!keyer) return resolve('absent');
-    const t = setTimeout(() => { keyer?.stdout.off('data', onData); resolve('muet'); }, 8000);
-    const onData = d => { const s = String(d); if (/pong|nokeys/.test(s)) { clearTimeout(t); keyer.stdout.off('data', onData); resolve(s.trim()); } };
-    keyer.stdout.on('data', onData);
-    keyer.stdin.write('ping\n');
-  });
+/* ---------- Presse-papiers : rendu après un collage automatique ----------
+   Verbe écrit le texte dicté dans le presse-papiers pour le coller ; une seconde après,
+   il remet ce qui s'y trouvait avant (texte, mise en forme ou image), sauf si quelqu'un
+   a copié autre chose entre-temps. */
+let savedClip = null;
+function saveClipboard() {
+  const f = clipboard.availableFormats();
+  /* des fichiers copiés (explorateur) ne se remettent pas fidèlement : on n'y touche pas */
+  if (f.some(x => /FileName|FileGroupDescriptor|HDROP|uri-list/i.test(x))) { savedClip = null; return; }
+  const img = clipboard.readImage();
+  savedClip = { text: clipboard.readText(), html: clipboard.readHTML(), rtf: clipboard.readRTF(), image: img.isEmpty() ? undefined : img };
 }
-global.verbePingKeyer = pingKeyer; /* pour les tests */
+function restoreClipboard(ours) {
+  const prev = savedClip; savedClip = null;
+  if (!prev) return;
+  setTimeout(() => {
+    if (clipboard.readText() !== ours) return; /* autre chose a été copié depuis : on le laisse */
+    const data = {};
+    for (const k of ['text', 'html', 'rtf']) if (prev[k]) data[k] = prev[k];
+    if (prev.image) data.image = prev.image;
+    if (Object.keys(data).length) clipboard.write(data); else clipboard.clear();
+  }, 1000);
+}
 
 /* ---------- Fenêtres ---------- */
 const prefs = extra => Object.assign({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false }, extra);
@@ -174,8 +178,13 @@ ipcMain.on('verbe:bubble', (e, v) => {
 ipcMain.on('verbe:preview', () => bubble?.webContents.send('verbe:preview'));
 ipcMain.on('verbe:mouse', (e, inside) => bubble?.setIgnoreMouseEvents(!inside, { forward: true }));
 ipcMain.on('verbe:open-main', (e, hash) => showMain(hash));
-ipcMain.handle('verbe:copy', (e, text) => { clipboard.writeText(text); return true; });
-ipcMain.handle('verbe:paste', async () => { await new Promise(r => setTimeout(r, 40)); return sendPaste(); });
+ipcMain.handle('verbe:copy', (e, text) => { saveClipboard(); clipboard.writeText(text); return true; });
+ipcMain.handle('verbe:paste', async () => {
+  await new Promise(r => setTimeout(r, 40));
+  const ok = sendPaste();
+  if (ok) restoreClipboard(clipboard.readText()); /* une seconde après, ce que tu avais copié revient */
+  return ok;
+});
 ipcMain.handle('verbe:shortcut', (e, a) => setShortcut(a));
 const loginOpts = () => ({ path: process.execPath, args: app.isPackaged ? ['--cache'] : [ROOT, '--cache'] });
 ipcMain.handle('verbe:login-get', () => app.getLoginItemSettings(loginOpts()).openAtLogin);
@@ -196,7 +205,7 @@ app.whenReady().then(() => {
     h['Access-Control-Expose-Headers'] = [EXPOSE];
     cb({ responseHeaders: h });
   });
-  startKeyer();
+  loadKeyboard();
   createBubble();
   createMain();
   createTray();
@@ -205,4 +214,4 @@ app.whenReady().then(() => {
 });
 app.on('window-all-closed', e => e.preventDefault());
 app.on('before-quit', () => { quitting = true; });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); try { keyer?.stdin.end(); keyer?.kill(); } catch (e) { /* fini */ } });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); });

@@ -1,7 +1,7 @@
 {
   "name": "verbe",
   "productName": "Verbe",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Verbe : dictée vocale. Raccourci partout, bulle ronde, collage automatique.",
   "author": "Landry Tchuente Tchouela",
   "main": "bureau/main.js",
@@ -19,11 +19,28 @@
     "appId": "com.landrytchouela.verbe",
     "productName": "Verbe",
     "copyright": "Landry Tchuente Tchouela",
-    "directories": { "output": "dist" },
-    "files": ["app/**", "bureau/**", "package.json"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app/**",
+      "bureau/**",
+      "package.json",
+      "!node_modules/koffi/build/koffi/!(win32_x64)/**",
+      "!node_modules/koffi/src/**",
+      "!node_modules/koffi/vendor/**",
+      "!node_modules/koffi/doc/**"
+    ],
     "asar": false,
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "bureau/icone.ico"
     },
     "nsis": {
@@ -38,5 +55,8 @@
       "uninstallerIcon": "bureau/icone.ico",
       "uninstallDisplayName": "Verbe"
     }
+  },
+  "dependencies": {
+    "koffi": "2.9.1"
   }
 }
