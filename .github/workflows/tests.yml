@@ -31,6 +31,12 @@ jobs:
         run: npm ci
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Types et tests rapides (Vitest)
+        run: npx tsc -p tsconfig.json && npx vitest run
+      - name: Construire la page et vérifier qu'elle correspond aux sources
+        run: |
+          npx vite build
+          git diff --exit-code -- app/ || (echo "::error::app/verbe.html n'est pas à jour : lance npm run build et enregistre le résultat" && exit 1)
       - name: Installer Chromium pour les tests
         run: npx playwright install --with-deps chromium
       - name: Tests de la version web
@@ -55,6 +61,8 @@ jobs:
           cache: npm
       - name: Installer les dépendances (avec Electron)
         run: npm ci
+      - name: Construire la page
+        run: npx vite build
       - name: Tests de la version bureau
         run: npx playwright test --project=bureau
       - name: Garder les traces en cas d'échec

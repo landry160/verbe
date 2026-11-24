@@ -37,7 +37,7 @@ jobs:
       - name: Installer les dépendances
         run: npm ci
       - name: Construire l'installateur (non signé)
-        run: npx electron-builder --win nsis --x64 --publish never
+        run: npx vite build && npx electron-builder --win nsis --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Publier la version GitHub

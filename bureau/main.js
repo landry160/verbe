@@ -8,6 +8,10 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const PAGE = path.join(ROOT, 'app', 'verbe.html');
+/* développement (npm run dev:bureau) : la page servie par Vite, qui se recharge à chaque modification ;
+   jamais dans l'app installée */
+const DEV_URL = !app.isPackaged && process.env.VERBE_DEV_URL ? process.env.VERBE_DEV_URL.replace(/\/$/, '') : '';
+const charger = (w, query) => DEV_URL ? w.loadURL(`${DEV_URL}/verbe.html${query ? '?' + new URLSearchParams(query) : ''}`) : w.loadFile(PAGE, query ? { query } : undefined);
 const ICON = path.join(__dirname, 'icone.png');
 const HIDDEN_START = process.argv.includes('--cache');
 /* fenêtre transparente plus grande que la pastille (440 × 92 au plus) : son ombre tient dedans */
@@ -213,7 +217,7 @@ function createMain() {
     backgroundColor: '#FAF7F3', icon: ICON, autoHideMenuBar: true, webPreferences: prefs(),
   });
   main.removeMenu();
-  main.loadFile(PAGE);
+  charger(main);
   main.on('close', e => { if (!quitting) { e.preventDefault(); main.hide(); } });
   main.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   main.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); } });
@@ -230,7 +234,7 @@ function createBubble() {
   bubble.setAlwaysOnTop(true, 'screen-saver');
   bubble.setVisibleOnAllWorkspaces(true);
   bubble.setIgnoreMouseEvents(true, { forward: true });
-  bubble.loadFile(PAGE, { query: { bulle: '1' } });
+  charger(bubble, { bulle: '1' });
 }
 
 function placeBubble(pos) {

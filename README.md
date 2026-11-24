@@ -24,9 +24,9 @@ Voir aussi `VISION.md` : ce que Verbe veut être, et ce qui ne doit pas changer.
 | Après la dictée | texte copié, tu fais Ctrl + V | texte **collé tout seul** là où tu écrivais |
 | « Ce qu'il te reste » | estimé par Verbe (24 h) | chiffres de Groq (requêtes) + audio compté par Verbe |
 
-Les deux versions partagent la même page (`app/verbe.html`). La version bureau ajoute
-seulement `bureau/` : la fenêtre, la bulle, le raccourci global, le collage et la lecture
-des compteurs de limite.
+Les deux versions partagent la même page (`app/verbe.html`), construite par Vite à partir de `src/`.
+La version bureau ajoute seulement `bureau/` : la fenêtre, la bulle, le raccourci global, le collage
+et la lecture des compteurs de limite.
 
 ## Utiliser la version bureau
 
@@ -130,12 +130,30 @@ d'origine, et « Retranscrire » coupe ses silences à nouveau. Les fichiers imp
 
 ## Développement
 
+Le code est rangé en fichiers ; **Vite** les rassemble en une seule page, `app/verbe.html`
+(c'est elle que chargent l'app bureau, GitHub Pages et les tests).
+
 ```
-npm install            # installe Electron et electron-builder
-npm start              # lance la version bureau (sans ELECTRON_RUN_AS_NODE dans l'environnement)
+src/verbe.html     le HTML de la page
+src/styles/        le CSS, une zone par fichier (jetons, Dicter, réglages, bulle…)
+src/app/           l'app, 00-outils.js … 12-demarrage.js : rassemblés dans l'ordre en un seul module
+src/lib/           la logique autonome en TypeScript (audio, texte, apps, versions), testée avec Vitest
+public/            polices et licences, copiées à côté de la page
+bureau/            l'app Electron (fenêtre, bulle, raccourcis, collage, mises à jour)
+```
+
+```
+npm install            # installe Electron, electron-builder, Vite, TypeScript, Vitest et Playwright
+npm run dev            # la page dans le navigateur (http://localhost:5173/verbe.html), rechargée à chaque modification
+npm run dev:bureau     # l'app bureau branchée sur Vite (profil à part), rechargée à chaque modification
+npm run build          # construit app/verbe.html (à enregistrer avec le reste : la CI vérifie qu'elle est à jour)
+npm start              # construit puis lance la version bureau
 npm run raccourci      # recrée les raccourcis Bureau et menu Démarrer (version de développement)
-npm run installateur   # construit dist\Verbe-Setup.exe, dist\latest.yml et dist\Verbe-Setup.exe.blockmap
+npm run installateur   # construit la page puis dist\Verbe-Setup.exe, dist\latest.yml et dist\Verbe-Setup.exe.blockmap
 ```
+
+- Les fichiers de `src/app/` partagent une seule portée (comme l'ancien script unique) : l'ordre des numéros compte.
+  Une logique qui ne dépend ni de la page ni des réglages va plutôt dans `src/lib/`, en TypeScript, avec ses tests.
 
 - Tester sans toucher les vrais réglages : `electron . --profil=<dossier>` (profil à part).
 - Mises à jour : la version de développement ne vérifie jamais (`app.isPackaged` faux). Pour essayer quand même :
@@ -150,10 +168,15 @@ npm run installateur   # construit dist\Verbe-Setup.exe, dist\latest.yml et dist
 
 ```
 npx playwright install chromium   # une fois : le navigateur des tests
-npm test                          # tout (la partie bureau seulement sous Windows)
+npm test                          # tout : types, tests rapides, puis Chromium et Electron (bureau : Windows seulement)
+npm run test:unit                 # tests rapides (Vitest) de src/lib, environ 1 s
+npm run typecheck                 # TypeScript strict sur src/lib
 npm run test:web                  # la page servie comme sur GitHub Pages, dans Chromium
 npm run test:bureau               # l'app Electron (Windows)
 ```
+
+- **Rapides** (`tests/unit`, Vitest) : commandes à la voix, nettoyage de la transcription, détection de voix,
+  silences coupés, découpe des longs audios, WAV, catégories d'apps, versions.
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
   « Nettoyer », mes mots et textes tout prêts, « Coller en » (traduction), Réglages (ordinateur et téléphone), « Ce qu'il te reste », progrès de l'Historique,

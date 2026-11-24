@@ -4767,8 +4767,14 @@ function wireUpdates() {
 	$("#maj-verifier").addEventListener("click", () => Desktop.checkUpdate().then(render));
 	$("#maj-redemarrer").addEventListener("click", () => Desktop.installUpdate());
 }
-var VERSION = "0.5.3";
+var VERSION = "0.6.0";
 var NOUVEAUTES = [
+	{
+		v: "0.6.0",
+		icon: "sparkles",
+		title: "Des transcriptions plus propres",
+		text: "Quand Whisper invente « Sous-titres réalisés par Amara.org » sur un silence, Verbe retire maintenant la phrase en entier."
+	},
 	{
 		v: "0.5.3",
 		icon: "mic",
@@ -6099,7 +6105,7 @@ body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v<span id="app-version">0.5.3</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
+          <p class="foot">Verbe v<span id="app-version">0.6.0</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
         </section>
 
       </div>

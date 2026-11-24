@@ -354,8 +354,9 @@ function wireUpdates() {
    Réglages › Général › « Nouveautés » la rouvre. À chaque version :
    monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
    ------------------------------------------------------------ */
-const VERSION = '0.5.3';
+const VERSION = '0.6.0';
 const NOUVEAUTES = [
+  { v: '0.6.0', icon: 'sparkles', title: 'Des transcriptions plus propres', text: 'Quand Whisper invente « Sous-titres réalisés par Amara.org » sur un silence, Verbe retire maintenant la phrase en entier.' },
   { v: '0.5.3', icon: 'mic', desk: true, title: 'La bulle descend', text: 'En bas, elle se pose juste au-dessus de la barre des tâches, plus loin de ce que tu écris.' },
   { v: '0.5.2', icon: 'audioLines', desk: true, title: 'La même voix partout', text: 'Pendant la dictée, la fenêtre de Verbe montre la même pastille que la bulle, à la place du micro.' },
   { v: '0.5.2', icon: 'download', desk: true, title: 'Des mises à jour qui se voient', text: 'Verbe cherche les nouvelles versions tout seul. Quand l’une est prête, un point rouge s’allume sur Réglages ; à l’installation, il te prévient et se rouvre tout seul.' },

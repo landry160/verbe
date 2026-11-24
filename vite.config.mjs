@@ -32,12 +32,12 @@ function assembler() {
 }
 
 export default defineConfig({
-  root: 'src',
+  root: ici('./src'),
   base: './',
-  publicDir: '../public', // polices et licences, copiées telles quelles à côté de la page
+  publicDir: ici('./public'), // polices et licences, copiées telles quelles à côté de la page
   plugins: [assembler(), viteSingleFile({ removeViteModuleLoader: true })],
   build: {
-    outDir: '../app',
+    outDir: ici('./app'),
     emptyOutDir: true,
     minify: false, // une page lisible : les erreurs restent faciles à suivre
     cssMinify: false,
