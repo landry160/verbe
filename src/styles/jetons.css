@@ -1,0 +1,73 @@
+@font-face { font-family: "Inter Fallback"; src: local("Arial"); ascent-override: 90.2%; descent-override: 22.48%; line-gap-override: 0%; size-adjust: 107.4%; }
+/* ============================================================
+   Verbe — prototype web v0.1
+   Style « Cuivre » de Landry (jetons design-cuivre B2).
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: #FAF7F3; --fg: #1C1714; --fg-2: #4A403A; --muted: #74685F;
+  --line: rgba(28,23,20,.09);
+  --surface: rgba(255,255,255,.76); --surface-strong: rgba(255,255,255,.93);
+  --surface-soft: rgba(255,255,255,.55); --edge: rgba(255,255,255,.9);
+  --shadow-card: 0 8px 30px rgba(60,30,10,.06);
+  --shadow-card-hover: 0 15px 40px rgba(60,30,10,.12);
+  --primary: #B65F27; --primary-strong: #8A4418; --primary-soft: #F6E8DE;
+  --text-accent: #8A4418; --focus: #B65F27;
+  --gradient-primary: linear-gradient(135deg, #AF6318 0%, #8A4418 100%);
+  --gradient-glow: linear-gradient(135deg, #E9A35F 0%, #A3501C 100%);
+  --gradient-text: linear-gradient(135deg, #B65F27 0%, #7A3A12 100%);
+  --shadow-primary: 0 10px 20px rgba(182,95,39,.30);
+  --orb1: rgba(222,146,78,.22); --orb2: rgba(244,186,96,.16); --orb3: rgba(190,112,70,.10);
+  --ok-bg: rgba(24,196,128,.13);    --ok-fg: #0B7A52;
+  --warn-bg: rgba(255,170,0,.17);   --warn-fg: #855300;
+  --info-bg: rgba(155,44,250,.11);  --info-fg: #6A1FC0;
+  --danger-bg: rgba(255,43,94,.11); --danger-fg: #B0123F;
+  --fill-ok: linear-gradient(135deg, #1E855C 0%, #0B704B 100%);
+  --fill-danger: linear-gradient(135deg, #D0103F 0%, #9E0E36 100%);
+  --fill-ink: linear-gradient(135deg, #3B2A20 0%, #16100C 100%);
+  --font: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --skel: rgba(28,23,20,.06);
+  --shine: rgba(255,255,255,.55);
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2374685F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #100C0A; --fg: #F4EEE9; --fg-2: #D8CDC4; --muted: #A59589;
+  --line: rgba(255,255,255,.08);
+  --surface: rgba(42,33,27,.84); --surface-strong: rgba(46,37,30,.96);
+  --surface-soft: rgba(50,40,33,.62); --edge: rgba(255,255,255,.09);
+  --shadow-card: 0 8px 30px rgba(0,0,0,.35); --shadow-card-hover: 0 15px 40px rgba(0,0,0,.5);
+  --primary-soft: rgba(182,95,39,.2); --text-accent: #F0BC8E; --focus: #E0904F;
+  --gradient-text: linear-gradient(135deg, #F5C99D 0%, #E0904F 100%);
+  --orb1: rgba(222,146,78,.15); --orb2: rgba(244,186,96,.08); --orb3: rgba(190,112,70,.08);
+  --ok-bg: rgba(24,196,128,.16);    --ok-fg: #5FE8B0;
+  --warn-bg: rgba(255,170,0,.16);   --warn-fg: #FFD36E;
+  --info-bg: rgba(155,44,250,.2);   --info-fg: #CDA4FF;
+  --danger-bg: rgba(255,43,94,.16); --danger-fg: #F2A0B1;
+  --skel: rgba(255,255,255,.06);
+  --shine: rgba(255,255,255,.08);
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23A59589' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #100C0A; --fg: #F4EEE9; --fg-2: #D8CDC4; --muted: #A59589;
+    --line: rgba(255,255,255,.08);
+    --surface: rgba(42,33,27,.84); --surface-strong: rgba(46,37,30,.96);
+    --surface-soft: rgba(50,40,33,.62); --edge: rgba(255,255,255,.09);
+    --shadow-card: 0 8px 30px rgba(0,0,0,.35); --shadow-card-hover: 0 15px 40px rgba(0,0,0,.5);
+    --primary-soft: rgba(182,95,39,.2); --text-accent: #F0BC8E; --focus: #E0904F;
+    --gradient-text: linear-gradient(135deg, #F5C99D 0%, #E0904F 100%);
+    --orb1: rgba(222,146,78,.15); --orb2: rgba(244,186,96,.08); --orb3: rgba(190,112,70,.08);
+    --ok-bg: rgba(24,196,128,.16);    --ok-fg: #5FE8B0;
+    --warn-bg: rgba(255,170,0,.16);   --warn-fg: #FFD36E;
+    --info-bg: rgba(155,44,250,.2);   --info-fg: #CDA4FF;
+    --danger-bg: rgba(255,43,94,.16); --danger-fg: #F2A0B1;
+    --skel: rgba(255,255,255,.06);
+    --shine: rgba(255,255,255,.08);
+    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23A59589' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}

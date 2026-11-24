@@ -1,0 +1,44 @@
+/* ============================================================
+   MINI-FENÊTRE FLOTTANTE (Document Picture-in-Picture)
+   L'île quitte la page et remplit une petite fenêtre que Chrome
+   garde par-dessus les autres onglets et apps. Placé en dernier :
+   ces règles l'emportent sur la position choisie pour la page.
+   ============================================================ */
+.pipdoc { margin: 0; height: 100vh; overflow: hidden; background: #16100C; }
+.island.pip, .island.pip[data-pos] { position: fixed; inset: 0; transform: none; z-index: auto; }
+.island.pip .isl {
+  width: 100vw; height: 100vh; border-radius: 0; border: 0; box-shadow: none;
+  opacity: 1; transform: none; transition: none; padding: 0 16px; gap: 12px;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: linear-gradient(135deg, #3B2A20 0%, #16100C 100%);
+}
+.island.pip .isl.shake { animation: none; }
+.island.pip[data-state="ready"] .isl { cursor: pointer; }
+.isl-act { display: none; }
+.spinning { animation: spin .9s linear infinite; }
+html.bureau .web-only { display: none !important; }
+html:not(.bureau) .desk-only { display: none !important; }
+
+/* v0.2 : le micro rond est au milieu de la mini-fenêtre ; la voix s'anime
+   de part et d'autre, la marque à gauche, le raccourci ou le chrono à droite. */
+.island.pip .isl-act {
+  display: grid; place-items: center; padding: 0;
+  position: absolute; z-index: 2; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
+  border: 0; border-radius: 50%; cursor: pointer; color: #fff;
+  background: var(--gradient-primary);
+  box-shadow: 0 0 0 calc(5px + var(--glow, 0) * 16px) rgba(233,163,95,.16), 0 8px 20px rgba(182,95,39,.5);
+}
+.island.pip .isl-act:focus-visible { outline: 2px solid #F0BC8E; outline-offset: 3px; }
+.island.pip[data-state="recording"] .isl-act { background: #fff; color: #8A4418; box-shadow: 0 0 0 calc(5px + var(--glow, 0) * 18px) rgba(233,163,95,.22), 0 8px 20px rgba(0,0,0,.4); }
+.island.pip:is([data-state="starting"], [data-state="transcribing"]) .isl-act { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); pointer-events: none; }
+.island.pip:is([data-state="done"], [data-state="warn"], [data-state="error"], [data-state="cancelled"]) .isl-act { display: none; }
+.island.pip:is([data-state="ready"], [data-state="starting"], [data-state="recording"], [data-state="transcribing"]) .isl-txt { display: none; }
+.island.pip:is([data-state="ready"], [data-state="starting"], [data-state="recording"], [data-state="transcribing"]) :is(.isl-l, .isl-r) { width: 58px; min-width: 0; }
+.island.pip:is([data-state="ready"], [data-state="starting"], [data-state="recording"], [data-state="transcribing"]) .isl-l { place-items: center start; }
+.island.pip[data-state="ready"] .isl-r { font: 700 12px/1.25 var(--font); color: rgba(255,255,255,.55); white-space: normal; letter-spacing: .02em; }
+.island.pip[data-state="ready"] .isl-act { animation: breathe 2.8s ease-in-out infinite; }
+.island.pip .isl-act .spin { width: 30px; height: 30px; }
+.isl-mark { width: 30px; height: 30px; display: block; }
+@media (prefers-reduced-motion: no-preference) { .island.pip .isl-act:active { transform: scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .island.pip[data-state="ready"] .isl-act { animation: none; } }
+@keyframes breathe { 0%, 100% { box-shadow: 0 0 0 5px rgba(233,163,95,.14), 0 8px 20px rgba(182,95,39,.5); } 50% { box-shadow: 0 0 0 11px rgba(233,163,95,.07), 0 8px 20px rgba(182,95,39,.5); } }

@@ -1,0 +1,87 @@
+/* ============================================================
+   L'ÎLE — l'indicateur au centre de l'écran
+   Pilule d'encre (sombre dans les deux thèmes, comme une « Dynamic
+   Island ») dont la taille change selon l'état.
+   ============================================================ */
+.island { position: fixed; left: 50%; z-index: 90; pointer-events: none; }
+.island[data-pos="center"] { top: 50%; transform: translate(-50%, -50%); }
+.island[data-pos="top"] { top: calc(env(safe-area-inset-top) + 84px); transform: translateX(-50%); }
+.island[data-pos="bottom"] { bottom: calc(env(safe-area-inset-bottom) + 32px); transform: translateX(-50%); }
+.isl {
+  --w: 300px; --h: 60px;
+  position: relative; pointer-events: auto; overflow: hidden;
+  width: min(var(--w), calc(100vw - 24px)); height: var(--h); border-radius: calc(var(--h) / 2);
+  display: flex; align-items: center; gap: 12px; padding: 0 20px 0 14px;
+  background: linear-gradient(135deg, rgba(59,42,32,.95) 0%, rgba(22,16,12,.97) 100%);
+  color: #fff; border: 1px solid rgba(255,255,255,.09);
+  box-shadow: 0 22px 60px rgba(20,10,4,.38), 0 3px 10px rgba(20,10,4,.25), inset 0 1px 0 rgba(255,255,255,.07);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  opacity: 0; transform: scale(.55);
+  transition: width .5s var(--spring), height .5s var(--spring), border-radius .5s var(--spring), transform .42s var(--spring), opacity .22s ease;
+}
+.island.on .isl { opacity: 1; transform: none; }
+.island[data-state="starting"] .isl { --w: 196px; --h: 56px; }
+/* même largeur à l'écoute et pendant la transcription : les barres se
+   transforment en mots sans que la pilule bouge */
+.island[data-state="recording"] .isl { --w: 340px; --h: 62px; cursor: pointer; }
+.island[data-state="recording"] .isl.has-cap { --w: 420px; --h: 88px; }
+.island[data-state="transcribing"] .isl { --w: 340px; --h: 62px; }
+:root[data-theme="dark"] .isl { border-color: rgba(255,255,255,.17); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .isl { border-color: rgba(255,255,255,.17); } }
+.island[data-state="done"] .isl { --w: 460px; --h: 84px; cursor: pointer; }
+.island[data-state="warn"] .isl, .island[data-state="error"] .isl { --w: 460px; --h: 96px; cursor: pointer; }
+.island:is([data-state="warn"], [data-state="error"]) :is(.isl-t, .isl-s) { white-space: normal; -webkit-mask-image: none; mask-image: none; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.island:is([data-state="warn"], [data-state="error"]) .isl-t { -webkit-line-clamp: 1; }
+.island[data-state="cancelled"] .isl { --w: 176px; --h: 52px; }
+.isl::before { /* reflet chaud qui suit le niveau de la voix */
+  content: ""; position: absolute; inset: -40% -10%; pointer-events: none;
+  background: radial-gradient(60% 70% at 50% 50%, rgba(233,163,95,.22), transparent 70%);
+  opacity: var(--glow, 0); transition: opacity .12s linear;
+}
+.isl-l { position: relative; flex: none; width: 32px; height: 32px; display: grid; place-items: center; }
+.isl-m { position: relative; flex: 1; height: 100%; }
+.isl-cv { position: absolute; left: 0; top: 50%; width: 100%; height: 38px; transform: translateY(-50%); transition: opacity .28s ease; }
+.isl.has-cap .isl-cv { top: calc(50% - 13px); height: 32px; }
+.island:not([data-state="recording"]):not([data-state="transcribing"]) .isl-cv { opacity: 0; transition: none; }
+.isl-txt { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; pointer-events: none; }
+.isl-t, .isl-s { margin: 0; white-space: nowrap; overflow: hidden; }
+.isl-t { font: 700 15px/1.3 var(--font); color: #fff; letter-spacing: -.005em; -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
+.isl-s { font: 600 13px/1.3 var(--font); color: rgba(255,255,255,.74); text-overflow: ellipsis; }
+.isl-cap { position: absolute; left: 0; right: 0; bottom: 13px; margin: 0; font: 600 13px/1.25 var(--font); color: rgba(255,255,255,.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.isl-r { position: relative; flex: none; min-width: 52px; text-align: right; font: 700 14px/1 var(--font); font-variant-numeric: tabular-nums; color: rgba(255,255,255,.84); white-space: nowrap; }
+.isl-t { transition: opacity .3s ease, transform .3s var(--ease); }
+.island[data-state="recording"] .isl-t { opacity: 0; transform: translateY(-4px); }
+.island[data-state="recording"] .isl-t.intro { opacity: 1; transform: none; }
+/* passage de relais : « À l'écoute » s'efface pendant que l'onde apparaît */
+.island[data-state="recording"] .isl-m:has(.isl-t.intro) .isl-cv { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .island[data-state="recording"] .isl-t.intro { opacity: 0; }
+  .island[data-state="recording"] .isl-m:has(.isl-t.intro) .isl-cv { opacity: 1; }
+  .isl-cv, .isl-t { transition: none; }
+}
+/* Dicter : la pastille prend la place du libellé sous le micro ; ailleurs, elle se pose en bas */
+.island.under-mic, .island.under-mic[data-pos] { top: var(--isl-top) !important; bottom: auto !important; transform: translateX(-50%) !important; }
+body.isl-under-mic :is(#mic-cap, #chips) { visibility: hidden; }
+body:not([data-view="dicter"]) .island[data-pos="center"]:not(.pip):not(.bulle) { top: auto; bottom: calc(env(safe-area-inset-bottom) + 112px); transform: translateX(-50%); }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: #FF4D5E; }
+.island[data-state="starting"] .dot { background: rgba(255,255,255,.5); }
+.spin { width: 24px; height: 24px; }
+.okc, .errc, .warnc, .xc { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; }
+.okc { background: var(--fill-ok); }
+.errc { background: var(--fill-danger); }
+.warnc { background: #FFC23D; color: #3D2A00; }
+.xc { background: rgba(255,255,255,.14); }
+.okc path { stroke-dasharray: 24; stroke-dashoffset: 0; }
+.w { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  .island[data-state="recording"] .dot { animation: dotPulse 1.4s ease-out infinite; }
+  .spin { animation: spin .9s linear infinite; }
+  .okc path { stroke-dashoffset: 24; animation: draw .42s .1s var(--ease) forwards; }
+  .okc { animation: pop .42s var(--spring); }
+  .w { opacity: 0; transform: translateY(6px); animation: wordIn .44s var(--ease) forwards; animation-delay: calc(var(--i) * 32ms + 60ms); }
+  .isl.shake { animation: shake .42s ease; }
+  .isl-s.fade { animation: fadeIn .4s .25s var(--ease) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .isl { transition: opacity .15s linear; transform: none; }
+}

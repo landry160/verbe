@@ -1,0 +1,63 @@
+/* ---------- Animations ---------- */
+@keyframes ring { 0% { box-shadow: 0 0 0 12px rgba(182,95,39,.45); } 100% { box-shadow: 0 0 0 44px rgba(182,95,39,0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes dotPulse { 0% { box-shadow: 0 0 0 0 rgba(255,77,94,.6); } 100% { box-shadow: 0 0 0 10px rgba(255,77,94,0); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes wordIn { to { opacity: 1; transform: none; } }
+@keyframes shake { 0%,100% { transform: none; } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+:root[data-theme="dark"] { --sw-off: #4C3F36; --sw-edge: rgba(255,255,255,.22); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sw-off: #4C3F36; --sw-edge: rgba(255,255,255,.22); } }
+
+/* ---------- Réglages sur écran étroit : les sections deviennent une rangée ---------- */
+@media (max-width: 900px) {
+  /* Écran 1 : « Réglages » et la liste des sections, chacune avec son état.
+     Écran 2 : une section, avec « ‹ Réglages » pour revenir. */
+  .reg { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .reg-nav { position: static; display: block; }
+  .reg.is-list .reg-body, .reg.is-pane .reg-list { display: none; }
+  .reg.is-list .reg-title { margin: 2px 2px 16px; font: 900 clamp(1.9rem, 2.4vw + 1rem, 3rem)/1.02 var(--font); letter-spacing: -.045em; text-transform: none; color: var(--fg); }
+  .reg.is-pane .reg-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; } /* caché à l'œil, gardé pour les lecteurs d'écran */
+  .reg-list { gap: 0; border-radius: 22px; background: var(--surface); border: 1px solid var(--edge); box-shadow: var(--shadow-card); overflow: hidden; }
+  .reg-tab, .reg-tab[aria-current="true"] { min-height: 68px; padding: 12px 14px 12px 16px; border-radius: 0; background: transparent; box-shadow: none; color: var(--fg); }
+  .reg-tab + .reg-tab { border-top: 1px solid var(--line); }
+  .reg-tab[aria-current="true"] .reg-ic { background: var(--primary-soft); color: var(--text-accent); }
+  .reg-tab::after { content: ""; flex: none; margin-left: auto; width: 20px; height: 20px; background: var(--chev) center / 20px no-repeat; transform: rotate(-90deg); }
+  .reg-tx { flex: 1; }
+  .pane-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -6px 0 4px -6px; padding: 0 10px 0 4px; border-radius: 999px; color: var(--text-accent); font: 800 15px/1 var(--font); text-decoration: none; }
+  /* les interrupteurs restent à droite ; seuls les choix larges passent dessous */
+  .srow:has(select), .srow:has(.seg), .srow:has(.kcap) { flex-wrap: wrap; }
+  .srow-c select { width: 100%; }
+  .srow:has(select) > .srow-c, .srow:has(.seg) > .srow-c { flex: 1 1 100%; }
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 720px) {
+  .tabs { display: none; }
+  .topbar-in { justify-content: center; }
+  .bnav {
+    display: flex; position: fixed; z-index: 45; left: 0; right: 0; bottom: 0;
+    padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    background: var(--surface); border-top: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+  }
+  .bn { flex: 1; min-height: 56px; border-radius: 16px; display: grid; justify-items: center; align-content: center; gap: 4px; text-decoration: none; color: var(--fg-2); font: 700 12.5px/1 var(--font); }
+  .bn[aria-current="page"] { background: var(--primary-soft); color: var(--text-accent); }
+  main { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+  body[data-view="dicter"] main { justify-content: flex-start; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .dock { bottom: calc(env(safe-area-inset-bottom) + 86px); }
+  .dock-tip { display: none; }
+  body:not([data-view="dicter"]) .island[data-pos="bottom"] { bottom: calc(env(safe-area-inset-bottom) + 170px); }
+  .toasts { top: auto; bottom: calc(env(safe-area-inset-bottom) + 84px); left: 16px; right: 16px; width: auto; }
+  .island[data-pos="bottom"] { bottom: calc(env(safe-area-inset-bottom) + 92px); }
+  .isl { padding: 0 16px 0 12px; gap: 10px; }
+  .modal-wrap { place-items: end stretch; padding: 0; }
+  .modal { width: 100%; border-radius: 32px 32px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .srow { padding: 14px 16px; }
+  .tile { min-height: 84px; }
+  .last { padding: 16px; }
+}

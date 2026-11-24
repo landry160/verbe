@@ -1,0 +1,20 @@
+/* ============================================================
+   FENÊTRE PRINCIPALE DU BUREAU, PENDANT LA DICTÉE (v0.5.2) : la même
+   pastille que la bulle prend la place du micro (gros micro sur Dicter,
+   micro flottant ailleurs) ; le micro revient quand la dictée finit.
+   ============================================================ */
+.island.miroir .isl { --w: 340px; --h: 52px; padding: 0 14px; gap: 8px; cursor: pointer; }
+.island.miroir .isl-act {
+  display: grid; place-items: center; padding: 0; position: absolute; z-index: 2; left: 50%; top: 50%;
+  width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 0; border-radius: 50%; cursor: pointer;
+  background: #fff; color: #8A4418;
+  box-shadow: 0 0 0 calc(3px + var(--glow, 0) * 9px) rgba(233,163,95,.22), 0 4px 12px rgba(0,0,0,.35);
+}
+.island.miroir .isl-act svg { width: 16px; height: 16px; }
+.island.miroir .isl-act .spin { width: 20px; height: 20px; }
+.island.miroir:is([data-state="starting"], [data-state="transcribing"]) .isl-act { background: rgba(255,255,255,.08); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); pointer-events: none; }
+.island.miroir:is([data-state="starting"], [data-state="recording"], [data-state="transcribing"]) .isl-txt { display: none; }
+.island.miroir:is([data-state="starting"], [data-state="recording"], [data-state="transcribing"]) :is(.isl-l, .isl-r) { width: 44px; min-width: 0; }
+.island.miroir .isl-l { place-items: center start; }
+.island.miroir .isl-r { font-size: 12.5px; }
+body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }

@@ -1,0 +1,42 @@
+/* ---------- Historique ---------- */
+.sec-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 20px; }
+.sec-head > div { display: grid; gap: 8px; }
+.count { margin: 0; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-strong); margin-bottom: 18px; color: var(--muted); }
+.search input { flex: 1; border: 0; outline: 0; background: transparent; min-height: 46px; font-size: 16px; color: var(--fg); }
+.search input::-webkit-search-cancel-button { filter: grayscale(1) opacity(.55); cursor: pointer; }
+.search:focus-within { outline: 2.5px solid var(--focus); outline-offset: 2px; }
+/* Progrès : une ligne discrète en haut de l'Historique ; le calcul s'explique d'un clic (ou au survol) */
+.prog { margin: -8px 0 16px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.prog > summary { display: block; list-style: none; cursor: pointer; font-weight: 600; font-variant-numeric: tabular-nums; border-radius: 8px; }
+.prog > summary::-webkit-details-marker { display: none; }
+.prog > summary b { color: var(--fg); font-weight: 800; }
+.prog > summary .nw { white-space: nowrap; }
+.prog > summary .ic { display: inline-block; vertical-align: -3px; margin-left: 6px; }
+.prog > .help { margin-top: 4px; font-size: 13px; }
+.hlist { display: grid; gap: 10px; }
+.hcard { border-radius: 20px; padding: 16px 18px; display: grid; gap: 8px; }
+.hacts .iconbtn { border-color: transparent; background: transparent; color: var(--muted); }
+@media (hover: hover) { .hacts .iconbtn:hover { color: var(--fg); background: var(--surface-soft); } }
+.hacts .iconbtn.danger { color: var(--danger-fg); }
+.hfoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.hfoot .meta { gap: 6px 8px; }
+.hfoot .hacts { gap: 2px; margin-right: -8px; }
+#t-hist { font-size: clamp(1.9rem, 2.4vw + 1rem, 3rem); line-height: 1.02; letter-spacing: -.045em; }
+.hcard .htop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hcard time { color: var(--muted); font-size: 14px; font-weight: 600; }
+.htext { margin: 0; font-size: 16px; font-weight: 400; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.hcard.open .htext { display: block; -webkit-line-clamp: unset; }
+.htext.err { color: var(--danger-fg); font-weight: 600; cursor: default; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meta span { display: inline-flex; align-items: center; gap: 6px; }
+.hacts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px; border-radius: 10px; font: 900 11px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; }
+.pill.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.pill.err { background: var(--danger-bg); color: var(--danger-fg); }
+.pill.pend { background: var(--primary-soft); color: var(--text-accent); }
+.pill.file { background: var(--info-bg); color: var(--info-fg); }
+.skel { background: var(--skel); border-radius: 10px; position: relative; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .skel::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, var(--shine), transparent); animation: shimmer 1.4s infinite; }
+}

@@ -1,0 +1,94 @@
+/* ---------- Vue Dicter : tient dans un seul écran, sans défilement ---------- */
+body[data-view="dicter"] main { display: flex; flex-direction: column; justify-content: center; padding-top: clamp(16px, 3.5vh, 48px); padding-bottom: clamp(16px, 3.5vh, 48px); }
+.dict { --mic: clamp(104px, 15vh, 136px); width: 100%; max-width: 760px; margin: 0 auto; display: grid; gap: clamp(14px, 2.8vh, 28px); justify-items: center; text-align: center; }
+.dict-head { display: grid; gap: clamp(8px, 1.4vh, 14px); }
+.dict h1 { font-size: clamp(2.2rem, 2.6vw + 2.2vh, 4.4rem); }
+.lead { margin: 0 auto; max-width: 54ch; color: var(--fg-2); font-size: 17px; }
+.mic-wrap { display: grid; justify-items: center; gap: clamp(10px, 1.6vh, 14px); padding: clamp(6px, 1.4vh, 14px) 0 0; }
+/* l'anneau autour du micro respire avec la voix (--lvl de 0 à 1) */
+.mic {
+  --lvl: 0;
+  position: relative; width: var(--mic); height: var(--mic); border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--gradient-primary); color: #fff;
+  box-shadow: 0 0 0 calc(12px + var(--lvl) * 26px) var(--primary-soft), var(--shadow-primary);
+  display: grid; place-items: center;
+}
+.mic::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+.mic .ic { width: calc(var(--mic) * .36); height: calc(var(--mic) * .36); }
+.mic[aria-pressed="true"] { box-shadow: 0 0 0 calc(12px + var(--lvl) * 26px) var(--primary-soft), 0 0 0 calc(15px + var(--lvl) * 26px) rgba(182,95,39,.35), var(--shadow-primary); }
+@media (prefers-reduced-motion: no-preference) {
+  .mic[aria-pressed="true"]::after, .dock[aria-pressed="true"]::after { animation: ring 1.5s ease-out infinite; }
+  .mic[aria-busy="true"] .ic, .dock[aria-busy="true"] .ic { animation: spin .9s linear infinite; }
+  .mic:active, .dock:active { transform: scale(.96); }
+  .mic[aria-pressed="true"], .dock[aria-pressed="true"] { transition: box-shadow .09s linear, transform .2s var(--ease); }
+}
+
+/* ---------- Le micro flottant : dicter depuis Historique et Réglages ---------- */
+.dock {
+  --lvl: 0;
+  position: fixed; z-index: 44; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 26px); margin-left: -32px;
+  width: 64px; height: 64px; border-radius: 50%; border: 0; cursor: pointer; color: #fff;
+  background: var(--gradient-primary);
+  box-shadow: 0 0 0 calc(7px + var(--lvl) * 18px) var(--primary-soft), var(--shadow-primary);
+  display: grid; place-items: center;
+}
+.dock::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+body[data-view="dicter"] .dock { display: none; }
+.dock-tip {
+  position: fixed; z-index: 44; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 102px);
+  padding: 6px 10px; border-radius: 10px; white-space: nowrap; pointer-events: none;
+  background: var(--fill-ink); color: #fff; font: 700 13px/1 var(--font); display: flex; align-items: center; gap: 6px;
+  opacity: 0; translate: 0 4px; transition: opacity .18s var(--ease), translate .18s var(--ease);
+}
+.dock-tip kbd { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.18); font-size: 11px; }
+body[data-view="dicter"] .dock-tip { display: none; }
+@media (hover: hover) { .dock:hover + .dock-tip, .dock:focus-visible + .dock-tip { opacity: 1; translate: 0 0; } }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) { .dock:hover { transform: translateY(-2px) scale(1.03); } }
+body:not([data-view="dicter"]) .island[data-pos="bottom"] { bottom: calc(env(safe-area-inset-bottom) + 112px); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) { .mic:hover { transform: translateY(-2px) scale(1.02); } }
+.only-coarse { display: none; }
+@media (pointer: coarse) { .only-fine { display: none !important; } .only-coarse { display: inline; } }
+.mic-cap { margin: 0; font: 800 15px/1.2 var(--font); color: var(--fg-2); min-height: 1.2em; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip {
+  min-height: 44px; max-width: 100%; padding: 0 14px; border-radius: 12px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line);
+  background: var(--surface-soft); color: var(--fg-2); font: 700 14px/1 var(--font);
+}
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
+.chip.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+@media (hover: hover) { .chip.quiet:hover { color: var(--fg); background: var(--surface-soft); box-shadow: none; transform: none; } }
+.chip.quiet[aria-pressed="true"] { box-shadow: none; background: var(--primary-soft); }
+.mic.needs-key { filter: saturate(.35); opacity: .55; }
+.chip.warn { background: var(--warn-bg); color: var(--warn-fg); border-color: transparent; }
+.chip[aria-pressed="true"] { background: var(--primary-soft); color: var(--text-accent); border-color: var(--primary); }
+.notice {
+  width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left;
+  padding: 14px 16px; border-radius: 20px; background: var(--primary-soft); color: var(--fg);
+}
+.notice .ic { color: var(--text-accent); margin-top: 2px; }
+.notice p { margin: 0; flex: 1; font-size: 15px; }
+.notice.warn { background: var(--warn-bg); }
+.notice.warn .ic { color: var(--warn-fg); }
+.notice .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.last { width: 100%; text-align: left; border-radius: 26px; padding: 18px 20px 20px; display: grid; gap: 12px; }
+.last-h { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.last-h .label { margin-right: auto; }
+.last-meta { margin: 0; color: var(--muted); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.last-actions { display: contents; }
+/* hauteur fixe : ni le chargement ni une nouvelle dictée ne font sauter l'écran ;
+   un long texte défile dans sa zone */
+#last-body { height: clamp(88px, 15.5vh, 150px); }
+.last textarea {
+  display: block; width: 100%; height: 100%; resize: none; border-radius: 16px; padding: 14px 16px;
+  border: 1px solid var(--line); background: var(--surface-strong); color: var(--fg);
+  font: 400 17px/1.55 var(--font);
+}
+#last-body > .empty { height: 100%; align-content: center; gap: 6px; padding: 0 8px; }
+#last-body > .empty .icbox { width: 40px; height: 40px; border-radius: 13px; }
+.empty { display: grid; justify-items: center; gap: 10px; padding: 18px 8px 10px; text-align: center; }
+.empty p { margin: 0; color: var(--fg-2); }
+.empty .small { color: var(--muted); font-size: 14px; }
+.icbox { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: var(--primary-soft); color: var(--text-accent); }
+.upload { display: grid; justify-items: center; gap: 8px; }
+.hint { margin: 0; color: var(--muted); font-size: 14px; }
