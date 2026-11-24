@@ -756,6 +756,10 @@ html.bulle, html.bulle body { background: transparent !important; overflow: hidd
 html.bulle body { display: block; }
 html.bulle body > :not(#island) { display: none !important; }
 .island.bulle, .island.bulle[data-pos] { display: grid; place-items: center; }
+/* en bas : la pastille se pose au bas de sa fenêtre (juste au-dessus de la barre des tâches), en haut : en haut ;
+   la marge garde la place de l'ombre (v0.5.3, « pourquoi n'est-elle pas plus descendue ? ») */
+.island.bulle[data-pos="bottom"] { place-items: end center; padding-bottom: 22px; }
+.island.bulle[data-pos="top"] { place-items: start center; padding-top: 10px; }
 .island.bulle .isl {
   /* v0.5.1 : une pastille fine (demande du 24 nov. : « trop grosse ») — 340 × 52 au lieu de 420 × 76 */
   --w: 340px; --h: 52px;
@@ -1158,7 +1162,7 @@ body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v<span id="app-version">0.5.2</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
+          <p class="foot">Verbe v<span id="app-version">0.5.3</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
         </section>
 
       </div>
@@ -4295,8 +4299,9 @@ function wireUpdates() {
    Réglages › Général › « Nouveautés » la rouvre. À chaque version :
    monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
    ------------------------------------------------------------ */
-const VERSION = '0.5.2';
+const VERSION = '0.5.3';
 const NOUVEAUTES = [
+  { v: '0.5.3', icon: 'mic', desk: true, title: 'La bulle descend', text: 'En bas, elle se pose juste au-dessus de la barre des tâches, plus loin de ce que tu écris.' },
   { v: '0.5.2', icon: 'audioLines', desk: true, title: 'La même voix partout', text: 'Pendant la dictée, la fenêtre de Verbe montre la même pastille que la bulle, à la place du micro.' },
   { v: '0.5.2', icon: 'download', desk: true, title: 'Des mises à jour qui se voient', text: 'Verbe cherche les nouvelles versions tout seul. Quand l’une est prête, un point rouge s’allume sur Réglages ; à l’installation, il te prévient et se rouvre tout seul.' },
   { v: '0.5.1', icon: 'copy', desk: true, title: 'Ta dictée reste dans le presse-papiers', text: 'Collée au mauvais endroit ? Clique où tu veux et fais Ctrl + V. Et Ctrl + Maj + 9 recolle la dernière dictée.' },
@@ -4311,12 +4316,15 @@ const News = {
   mark() { try { localStorage.setItem(this.key, VERSION); } catch (e) { /* stockage indisponible */ } },
   /* ce qui est nouveau depuis la version vue (dans la version web : seulement ce qui la concerne) */
   since(after) { return NOUVEAUTES.filter(n => cmpVer(n.v, after) > 0 && cmpVer(n.v, VERSION) <= 0 && (Desktop || !n.desk)); },
-  maybeShow() {
-    if (IS_BUBBLE) return;
+  /* ce qu'il faut montrer à ce démarrage ; décidé (et noté pour une nouvelle installation) tout de suite,
+     pour qu'un Verbe fermé aussitôt ouvert ne prenne pas sa première visite pour une mise à jour */
+  pending() {
+    if (IS_BUBBLE) return [];
     let vu = this.seen();
-    if (!vu) { if (!DEJA_LA) { this.mark(); return; } vu = '0.5.0'; } /* avant la 0.5.2, rien n'était noté */
+    if (!vu) { if (!DEJA_LA) { this.mark(); return []; } vu = '0.5.0'; } /* avant la 0.5.2, rien n'était noté */
     const list = this.since(vu);
-    if (list.length) this.open(list); else this.mark();
+    if (!list.length) this.mark();
+    return list;
   },
   open(list = NOUVEAUTES.filter(n => n.v === VERSION && (Desktop || !n.desk))) {
     if (!list.length || $('#news')) return;
@@ -4376,7 +4384,8 @@ function init() {
   $('#app-version').textContent = VERSION;
   $('#btn-news').addEventListener('click', () => News.open());
   $('#news-link').hidden = !NOUVEAUTES.some(n => n.v === VERSION && (Desktop || !n.desk)); /* rien de neuf ici : pas de lien */
-  setTimeout(() => News.maybeShow(), 600); /* après l'ouverture : la page se pose d'abord */
+  const nouveau = News.pending();
+  if (nouveau.length) setTimeout(() => News.open(nouveau), 600); /* après l'ouverture : la page se pose d'abord */
   UI.renderShortcut();
   UI.renderChips();
   UI.renderLast();
@@ -4390,6 +4399,7 @@ function init() {
   addEventListener('storage', e => { if (e.key === STATS_KEY || e.key == null) UI.renderProgress(); });
   window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
   Object.assign(window.Verbe, { silenceSpans, trimSilences, TRIM }); /* silences coupés avant l'envoi */
+  Object.assign(window.Verbe, { News, NOUVEAUTES, VERSION }); /* nouveautés (tests) */
   window.Verbe.Stats = Stats; /* progrès, pour les tests */
   Object.assign(window.Verbe, { fixWords, wordsPrompt, wholeSnippet, insertSnippets }); /* Mes mots, pour les tests */
   Object.assign(window.Verbe, { appCategory, llmPlan, llmPrompt }); /* traduction et ton selon l'app (tests) */

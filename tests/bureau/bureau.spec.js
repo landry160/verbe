@@ -67,6 +67,14 @@ test('la bulle est en bas par défaut, et se place en haut ou au centre aussitô
   };
   const bas = await placer('bottom', i => i.y > i.h * 0.7);
   expect(Math.abs(bas.x - bas.l / 2), 'centrée horizontalement').toBeLessThan(2);
+  // juste au-dessus de la barre des tâches : le bas de la pastille à moins de 30 px de la zone utile
+  const ecart = await app.evaluate(({ BrowserWindow, screen }) => {
+    const b = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('bulle=1'));
+    const r = b.getBounds(), zone = screen.getDisplayMatching(r).workArea;
+    return zone.y + zone.height - (r.y + r.height);
+  });
+  const sousLaPastille = await bulle.evaluate(() => window.innerHeight - document.querySelector('#island .isl').getBoundingClientRect().bottom);
+  expect(ecart + sousLaPastille, 'espace sous la pastille').toBeLessThanOrEqual(30);
   await placer('top', i => i.y < i.h * 0.3);
   await placer('center', i => Math.abs(i.y - i.h / 2) < i.h * 0.1);
   await expect.poll(async () => (await infoBulle()).visible, { message: 'fin de l’aperçu', timeout: 25_000 }).toBe(false);

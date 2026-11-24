@@ -56,18 +56,22 @@ test('une nouvelle installation n’affiche pas de nouveautés', async () => {
   expect(await principale.evaluate(() => localStorage.getItem('verbe.nouveautes'))).toBe(VERSION);
 });
 
+/* la liste de la page : ce qui est nouveau depuis une version (côté bureau) */
+const depuis = v => principale.evaluate(x => window.Verbe.News.since(x).map(n => n.title), v);
+
 test('après une mise à jour : une nouveauté par page, puis plus jamais pour cette version', async () => {
-  await relancer('0.5.1');
+  const attendus = await principale.evaluate(() => window.Verbe.NOUVEAUTES.filter(n => n.v === window.Verbe.VERSION).map(n => n.title));
+  expect(attendus.length, 'la version a ses nouveautés').toBeGreaterThan(0);
+  const avant = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v !== window.Verbe.VERSION)?.v || '0.5.0');
+  await relancer(avant);
   await expect.poll(async () => (await fenetre()).ouverte).toBe(true);
-  let f = await fenetre();
-  expect(f.kick).toBe(`Nouveau dans Verbe ${VERSION} · 1 / 2`);
-  expect(f.titre).toBe('La même voix partout');
-  expect(f.bouton).toBe('Suivant');
-  await principale.click('#news [data-n="next"]');
-  f = await fenetre();
-  expect(f.kick).toBe(`Nouveau dans Verbe ${VERSION} · 2 / 2`);
-  expect(f.bouton).toBe('C’est parti');
-  await principale.click('#news [data-n="next"]');
+  for (let i = 0; i < attendus.length; i++) {
+    const f = await fenetre();
+    expect(f.kick).toBe(attendus.length > 1 ? `Nouveau dans Verbe ${VERSION} · ${i + 1} / ${attendus.length}` : `Nouveau dans Verbe ${VERSION}`);
+    expect(f.titre).toBe(attendus[i]);
+    expect(f.bouton).toBe(i === attendus.length - 1 ? 'C’est parti' : 'Suivant');
+    await principale.click('#news [data-n="next"]');
+  }
   expect((await fenetre()).ouverte).toBe(false);
   expect(await principale.evaluate(() => localStorage.getItem('verbe.nouveautes'))).toBe(VERSION);
 
@@ -78,21 +82,47 @@ test('après une mise à jour : une nouveauté par page, puis plus jamais pour c
 });
 
 test('venant d’une version qui ne notait rien (0.5.1) : les nouveautés depuis la 0.5.0, Échap ferme', async () => {
+  const n = (await depuis('0.5.0')).length;
   await relancer(null);
   await expect.poll(async () => (await fenetre()).ouverte).toBe(true);
-  expect((await fenetre()).kick).toMatch(/ · 1 \/ 4$/);
+  expect((await fenetre()).kick).toMatch(new RegExp(` · 1 / ${n}$`));
   await principale.keyboard.press('Escape');
   expect((await fenetre()).ouverte).toBe(false);
   expect(await principale.evaluate(() => localStorage.getItem('verbe.nouveautes'))).toBe(VERSION);
 });
 
 test('Réglages › Général › « Nouveautés » rouvre la fenêtre', async () => {
+  const premier = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v === window.Verbe.VERSION).title);
   await principale.evaluate(() => { location.hash = '#reglages/general'; });
   await expect(principale.locator('#btn-news')).toBeVisible();
   await principale.click('#btn-news');
-  await expect.poll(async () => (await fenetre()).titre).toBe('La même voix partout');
+  await expect.poll(async () => (await fenetre()).titre).toBe(premier);
   await principale.waitForTimeout(700); // fin de l'animation d'ouverture
   await principale.screenshot({ path: path.join(os.tmpdir(), 'verbe-nouveautes.png') });
-  await principale.click('#news [data-n="skip"]');
+  await principale.keyboard.press('Escape'); // une seule page : pas de « Passer »
   expect((await fenetre()).ouverte).toBe(false);
+});
+
+test('une nouvelle installation fermée aussitôt ouverte ne prend pas la suivante pour une mise à jour', async () => {
+  const p = fs.mkdtempSync(path.join(os.tmpdir(), 'verbe-profil-news2-'));
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const lancer = async () => {
+    const a = await electron.launch({ executablePath: require('electron'), args: [RACINE, `--profil=${p}`], env });
+    await expect.poll(() => a.windows().length, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+    const w = a.windows().find(x => !x.url().includes('bulle=1'));
+    await pret(w);
+    return { a, w };
+  };
+  try {
+    let { a, w } = await lancer();
+    await w.evaluate(() => window.Verbe.Settings.save()); // des réglages enregistrés, puis fermé tout de suite
+    await a.close();
+    ({ a, w } = await lancer());
+    await w.waitForTimeout(1200);
+    expect(await w.evaluate(() => !!document.querySelector('#news')), 'pas de fenêtre des Nouveautés').toBe(false);
+    await a.close();
+  } finally {
+    fs.rmSync(p, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  }
 });

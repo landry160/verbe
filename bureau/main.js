@@ -236,7 +236,7 @@ function createBubble() {
 function placeBubble(pos) {
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const x = Math.round(d.x + (d.width - BUBBLE_W) / 2);
-  const y = pos === 'top' ? d.y + 24 : pos === 'bottom' ? d.y + d.height - BUBBLE_H - 12 : Math.round(d.y + (d.height - BUBBLE_H) / 2);
+  const y = pos === 'top' ? d.y + 24 : pos === 'bottom' ? d.y + d.height - BUBBLE_H : Math.round(d.y + (d.height - BUBBLE_H) / 2);
   bubble.setBounds({ x, y, width: BUBBLE_W, height: BUBBLE_H });
 }
 
