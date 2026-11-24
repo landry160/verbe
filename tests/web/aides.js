@@ -12,6 +12,17 @@ const { expect } = base;
 // Réglages d'une personne qui a déjà collé sa clé (migrations déjà faites).
 const REGLAGES = { provider: 'groq', keys: { groq: 'gsk_test' }, floating: false, scV: 2, fixV: 1, posV: 1 };
 
+/** Les champs texte d'un formulaire multipart (model, language, prompt…) ; les fichiers sont ignorés. */
+function champsDuFormulaire(corps) {
+  const texte = corps.toString('latin1');
+  const champs = {};
+  for (const partie of texte.split(/--[^\r\n]+\r\n/)) {
+    const m = partie.match(/^Content-Disposition: form-data; name="([^"]+)"(; filename="[^"]*")?\r\n(?:[^\r\n]+\r\n)*\r\n([\s\S]*?)\r\n$/);
+    if (m && !m[2]) champs[m[1]] = Buffer.from(m[3], 'latin1').toString('utf8');
+  }
+  return champs;
+}
+
 const reponse = (status, corps, entetes = {}) => ({
   status,
   headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', ...entetes },
@@ -26,9 +37,11 @@ const test = base.test.extend({
         texte: 'Bonjour, ceci est un test de Verbe.', // ce que « Groq » transcrit
         statut: 200, // 429 pour simuler la limite atteinte
         entetes: {}, // en-têtes de limite (lisibles seulement dans l'app bureau)
-        nettoye: 'Texte nettoyé.', // réponse du modèle pour « Nettoyer »
+        nettoye: 'Texte nettoyé.', // réponse du modèle (texte, ou fonction (corps de la requête) => texte)
         transcriptions: 0,
-        corpsChat: null,
+        envois: [], // chaque envoi d'audio : { octets, champs } (champs texte du formulaire : model, language, prompt…)
+        corpsChat: null, // la dernière requête au modèle de langue
+        corpsChats: [], // toutes les requêtes au modèle de langue
         dehors: [],
       };
       await context.route(
@@ -37,6 +50,8 @@ const test = base.test.extend({
           const u = route.request().url();
           if (u === 'https://api.groq.com/openai/v1/audio/transcriptions') {
             g.transcriptions++;
+            const corps = route.request().postDataBuffer() || Buffer.alloc(0);
+            g.envois.push({ octets: corps.length, champs: champsDuFormulaire(corps), corps });
             return route.fulfill(
               g.statut === 200 ? reponse(200, { text: g.texte }, g.entetes) : reponse(g.statut, { error: { message: 'rate limit' } }, g.entetes),
             );
@@ -46,7 +61,9 @@ const test = base.test.extend({
           }
           if (u === 'https://api.groq.com/openai/v1/chat/completions') {
             g.corpsChat = route.request().postDataJSON();
-            return route.fulfill(reponse(200, { choices: [{ message: { content: g.nettoye } }] }));
+            g.corpsChats.push(g.corpsChat);
+            const contenu = typeof g.nettoye === 'function' ? g.nettoye(g.corpsChat) : g.nettoye;
+            return route.fulfill(reponse(200, { choices: [{ message: { content: contenu } }] }));
           }
           g.dehors.push(u);
           return route.abort();

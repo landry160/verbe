@@ -62,3 +62,11 @@ test('Réglages › Texte : « Commandes à la voix » est là, « Coller automa
   await expect(page.locator('[data-switch="voiceCmds"]')).toBeVisible();
   await expect(page.locator('[data-switch="autoPaste"]')).toBeHidden();
 });
+
+test('l’audio part vers Groq avec le modèle et la langue choisis', async ({ page, groq }) => {
+  await ouvrir(page);
+  await dicter(page);
+  expect(groq.envois).toHaveLength(1);
+  expect(groq.envois[0].octets).toBeGreaterThan(1000);
+  expect(groq.envois[0].champs).toMatchObject({ model: expect.stringMatching(/^whisper/), language: 'fr' });
+});
