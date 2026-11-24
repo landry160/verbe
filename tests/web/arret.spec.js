@@ -19,10 +19,11 @@ test('par défaut : arrêt après 20 s de silence, réglable dans Réglages › 
 });
 
 test('on a parlé puis plus rien : Verbe s’arrête, transcrit, copie et libère le micro', async ({ page, groq }) => {
-  await ouvrir(page, { reglages: { ...REGLAGES, autoStop: '1' } }); // 1 s pour le test (l'écran propose 10 s à 1 min)
+  await ouvrir(page, { reglages: { ...REGLAGES, autoStop: '2' } }); // 2 s pour le test (l'écran propose 10 s à 1 min)
   await page.evaluate(() => window.Verbe.App.toggle());
   await attendreEtat(page, 'recording');
-  await page.waitForTimeout(1200); // de la « voix »
+  // de la « voix » : on attend qu'elle soit vraiment entendue (pas un délai fixe, qui échoue sous forte charge)
+  await page.waitForFunction(() => window.Verbe.Rec.voiced >= 8, null, { timeout: 8000 });
   await couperLeSon(page);
   await attendreEtat(page, 'idle', 12000); // personne n'a appuyé sur le raccourci
   expect(groq.transcriptions).toBe(1);
