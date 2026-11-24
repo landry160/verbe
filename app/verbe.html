@@ -308,6 +308,14 @@ body:not([data-view="dicter"]) .island[data-pos="bottom"] { bottom: calc(env(saf
 .search input { flex: 1; border: 0; outline: 0; background: transparent; min-height: 46px; font-size: 16px; color: var(--fg); }
 .search input::-webkit-search-cancel-button { filter: grayscale(1) opacity(.55); cursor: pointer; }
 .search:focus-within { outline: 2.5px solid var(--focus); outline-offset: 2px; }
+/* Progrès : une ligne discrète en haut de l'Historique ; le calcul s'explique d'un clic (ou au survol) */
+.prog { margin: -8px 0 16px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.prog > summary { display: block; list-style: none; cursor: pointer; font-weight: 600; font-variant-numeric: tabular-nums; border-radius: 8px; }
+.prog > summary::-webkit-details-marker { display: none; }
+.prog > summary b { color: var(--fg); font-weight: 800; }
+.prog > summary .nw { white-space: nowrap; }
+.prog > summary .ic { display: inline-block; vertical-align: -3px; margin-left: 6px; }
+.prog > .help { margin-top: 4px; font-size: 13px; }
 .hlist { display: grid; gap: 10px; }
 .hcard { border-radius: 20px; padding: 16px 18px; display: grid; gap: 8px; }
 .hacts .iconbtn { border-color: transparent; background: transparent; color: var(--muted); }
@@ -773,6 +781,8 @@ html.bulle body > :not(#island) { display: none !important; }
       <div><h1 id="t-hist">Historique</h1></div>
       <p class="count" id="h-count"></p>
     </div>
+    <!-- progrès : rien tant qu'aucune dictée n'a réussi -->
+    <details class="prog" id="h-prog" hidden><summary id="h-prog-line" title="Temps gagné estimé : tes mots tapés au clavier à 40 mots par minute, moins le temps passé à parler."></summary><p class="help">Temps gagné estimé : tes mots tapés au clavier à 40 mots par minute, moins le temps passé à parler (dictées au micro seulement).</p></details>
     <label class="search"><span data-icon="search" data-size="20"></span><span class="sr-only">Rechercher dans l’historique</span><input id="h-search" type="search" placeholder="Rechercher un mot…" autocomplete="off" enterkeyhint="search"></label>
     <div class="hlist" id="h-list" aria-live="polite"></div>
   </section>
@@ -1352,6 +1362,57 @@ const Quota = {
   },
 };
 const srLang = () => ({ fr: 'fr-CA', en: 'en-CA' }[Settings.d.lang] || navigator.language || 'fr-CA');
+
+/* Progrès (en haut de l'Historique) : un compteur à part, car l'historique ne garde que 100 dictées.
+   Une dictée au micro réussie compte une seule fois : ni « Nettoyer », ni une retranscription, ni un fichier.
+   Forme : { v, n (dictées), w (mots), ms (temps de parole), days: { 'AAAA-MM-JJ': [n, w, ms] } } */
+const STATS_KEY = 'verbe.stats';
+const TYPING_WPM = 40; /* hypothèse : vitesse de frappe au clavier */
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const Stats = {
+  read() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(STATS_KEY) || 'null'); } catch (e) { s = null; }
+    if (!s || typeof s !== 'object' || !(s.n >= 0)) s = { v: 1, n: 0, w: 0, ms: 0, days: {} };
+    if (!s.days || typeof s.days !== 'object') s.days = {};
+    return s;
+  },
+  write(s) {
+    for (const k of Object.keys(s.days).sort().slice(0, -400)) delete s.days[k]; /* les jours suffisent pour la semaine et la série */
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (e) { /* stockage bloqué : ce n'est qu'un compteur */ }
+  },
+  bump(s, it) {
+    const k = dayKey(it.createdAt || Date.now()), d = s.days[k] || [0, 0, 0], ms = Math.max(0, Math.round(it.durationMs || 0));
+    s.n++; s.w += it.words; s.ms += ms;
+    s.days[k] = [d[0] + 1, d[1] + it.words, d[2] + ms];
+  },
+  /* relu juste avant d'écrire : la bulle et la fenêtre principale (bureau) partagent ce compteur */
+  add(item) {
+    if (!item || item.counted || item.source !== 'micro' || item.status !== 'ok' || !item.words) return false;
+    item.counted = true;
+    const s = this.read(); this.bump(s, item); this.write(s);
+    return true;
+  },
+  /* la première fois : on part des dictées déjà gardées dans l'historique */
+  seed(items) {
+    try { if (localStorage.getItem(STATS_KEY) != null) return; } catch (e) { return; }
+    const s = this.read();
+    for (const it of items) if (it.status === 'ok' && it.source === 'micro' && it.words) this.bump(s, it);
+    this.write(s);
+  },
+  summary(at = Date.now()) {
+    const s = this.read(), d = new Date(at);
+    const monday = dayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)));
+    let week = 0;
+    for (const [k, v] of Object.entries(s.days)) if (k >= monday) week += v[1] || 0;
+    /* série : jours de suite avec au moins une dictée, jusqu'à aujourd'hui (ou hier) */
+    let streak = 0;
+    const c = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (!s.days[dayKey(c)]) c.setDate(c.getDate() - 1);
+    while (s.days[dayKey(c)]) { streak++; c.setDate(c.getDate() - 1); }
+    return { n: s.n, words: s.w, week, ms: s.ms, gainMs: Math.max(0, (s.w / TYPING_WPM) * 60000 - s.ms), streak };
+  },
+};
 
 /* ============================================================
    3. Petits éléments d'interface : toasts, modale, sons
@@ -2758,6 +2819,7 @@ const App = {
       return;
     }
     Object.assign(item, { text, status: 'ok', error: '', words: countWords(text) });
+    Stats.add(item); /* progrès : compté une seule fois, avant l'enregistrement qui prévient l'autre fenêtre */
     const copied = Settings.d.autoCopy || IS_BUBBLE ? await copyText(text) : false;
     /* bureau : le texte se colle tout seul dans l'app où tu écrivais */
     const pasted = IS_BUBBLE && copied && Settings.d.autoPaste ? await Desktop.paste().catch(() => false) : false;
@@ -2801,6 +2863,7 @@ const App = {
     const item = this.items.find(i => i.id === id); if (!item) return;
     const blob = await Store.getAudio(id).catch(() => null);
     if (!blob) { Toast.show({ type: 'error', text: 'L’audio de cette dictée n’est plus disponible.' }); return; }
+    if (item.status === 'ok') item.counted = true; /* progrès : une dictée déjà réussie ne compte pas deux fois */
     if (this.needsKey() || PROVIDERS[this.pid].kind === 'webspeech') return this.blocked('Choisis un service avec une clé pour réessayer.', 'Clique ici pour ouvrir Réglages.');
     Island.show('transcribing', { label: 'Nouvel essai' });
     await this.runTranscription(item, blob, { tStop: now(), name: item.fileName || '' });
@@ -2943,9 +3006,29 @@ const UI = {
     this.fitLast();
   },
 
+  /* progrès : mots dictés (semaine, total), temps gagné estimé, série de jours ; rien avant la première dictée */
+  renderProgress() {
+    const el = $('#h-prog'), line = $('#h-prog-line');
+    if (!el || !line) return;
+    const p = Stats.summary();
+    el.hidden = !p.n;
+    if (!p.n) return;
+    const seg = (n, rest) => `<span class="nw"><b>${n}</b>&nbsp;${rest}</span>`;
+    const mots = n => (n > 1 ? 'mots' : 'mot');
+    const out = [];
+    if (p.week && p.week < p.words) out.push(seg(nf0.format(p.week), `${mots(p.week)} cette semaine`), seg(nf0.format(p.words), 'au total'));
+    else out.push(seg(nf0.format(p.words), `${mots(p.words)} ${p.words > 1 ? 'dictés' : 'dicté'}${p.week ? '' : ' au total'}`));
+    const sec = Math.round(p.gainMs / 1000), gain = fmtAudio(sec);
+    if (sec >= 1) out.push(seg(`≈&nbsp;${gain}`, /^1 (s|min)$/.test(gain) ? 'gagnée' : 'gagnées'));
+    if (p.streak >= 3) out.push(seg(p.streak, 'jours de suite'));
+    out[out.length - 1] = out[out.length - 1].replace(/<\/span>$/, `${icon('info', 16)}</span>`); /* l'icône reste avec le dernier bout */
+    line.innerHTML = out.join('<span aria-hidden="true"> · </span>');
+  },
+
   renderHistory() {
     const list = $('#h-list'), count = $('#h-count');
     if (!list) return;
+    this.renderProgress();
     if (App.loadState === 'loading') {
       count.textContent = '';
       list.innerHTML = Array.from({ length: 3 }, () => `<div class="glass hcard" aria-hidden="true"><div class="skel" style="height:14px;width:30%"></div><div class="skel" style="height:14px;width:92%"></div><div class="skel" style="height:14px;width:70%"></div></div>`).join('');
@@ -3479,6 +3562,7 @@ async function loadHistory({ quiet = false } = {}) {
   }
   /* une dictée restée « en cours » (page fermée) devient un échec qu'on peut réessayer */
   for (const it of App.items) if (it.status === 'pending') { it.status = 'error'; it.error = 'Interrompue avant la fin.'; Store.put(it).catch(() => {}); }
+  Stats.seed(App.items); /* progrès : la première fois, on part de l'historique déjà gardé */
   App.last = App.items.find(i => i.status === 'ok') || null;
   UI.renderLast(); UI.renderHistory();
 }
@@ -3533,7 +3617,10 @@ function init() {
   loadHistory();
   Mics.refresh().then(() => { UI.renderMics(); UI.renderChips(); });
   if (Desktop) wireDesktop();
+  /* progrès : un autre onglet ou la bulle (bureau) a compté une dictée */
+  addEventListener('storage', e => { if (e.key === STATS_KEY || e.key == null) UI.renderProgress(); });
   window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
+  window.Verbe.Stats = Stats; /* progrès, pour les tests */
 }
 init();
 }
