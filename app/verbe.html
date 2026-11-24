@@ -421,6 +421,13 @@ body:not([data-view="dicter"]) .island[data-pos="bottom"] { bottom: calc(env(saf
 .cmds { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 10px 0 2px; font-size: 14px; }
 .cmds dt { font-weight: 800; color: var(--fg); }
 .cmds dd { margin: 0; color: var(--muted); }
+/* Mes mots et textes tout prêts : une liste simple (ajouter, modifier, retirer) */
+.mlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.mlist:empty { display: none; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.mrow-snip { grid-template-columns: minmax(0, 1fr) auto; }
+.mrow-snip textarea { grid-column: 1 / -1; width: 100%; min-height: 96px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-strong); color: var(--fg); font: 500 16px/1.4 var(--font); resize: vertical; }
+@media (max-width: 560px) { .mlist { gap: 18px; } .mrow { gap: 6px; } .mrow:not(.mrow-snip) { grid-template-columns: minmax(0, 1fr) auto; } .mrow:not(.mrow-snip) .m-heard { grid-column: 1; grid-row: 2; } }
 .field { display: grid; gap: 8px; }
 .flabel { font: 800 14px/1.3 var(--font); color: var(--fg); }
 .help { margin: 0; color: var(--muted); font-size: 14px; }
@@ -948,6 +955,23 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="copy-label" data-switch="autoCopy"></button></div>
             </div>
           </div>
+          <div class="group" id="mots-group">
+            <div class="srow srow-stack">
+              <div class="srow-t"><span class="flabel" id="words-label">Mes mots</span><p class="help">Noms propres et jargon, écrits comme tu les veux. Si Verbe les écrit mal, ajoute ce qu’il entend.</p></div>
+              <div class="srow-c">
+                <ul class="mlist" id="words-list" aria-labelledby="words-label"></ul>
+                <p class="help" id="words-note" hidden></p>
+                <div><button class="btn btn-2 btn-sm" id="btn-word-add" type="button"><span data-icon="plus" data-size="16"></span>Ajouter un mot</button></div>
+              </div>
+            </div>
+            <div class="srow srow-stack">
+              <div class="srow-t"><span class="flabel" id="snips-label">Textes tout prêts</span><p class="help">Ta signature, ton courriel… Dis juste son nom, ou «&nbsp;insère ma signature&nbsp;» dans une phrase à part.</p></div>
+              <div class="srow-c">
+                <ul class="mlist" id="snips-list" aria-labelledby="snips-label"></ul>
+                <div><button class="btn btn-2 btn-sm" id="btn-snip-add" type="button"><span data-icon="plus" data-size="16"></span>Ajouter un texte</button></div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- Bulle (bureau) / Indicateur (web) -->
@@ -1175,6 +1199,8 @@ const DEFAULTS = {
   autoPaste: true,
   autoStop: '20', /* secondes sans voix avant l'arrêt automatique ; '0' = jamais */
   llm: {},
+  words: [], /* Mes mots : [{ word: 'SlideFabrik', heard: 'slide fabrique' }] */
+  snippets: [], /* Textes tout prêts : [{ name: 'signature', text: '…' }] */
 };
 
 /* ------------------------------------------------------------
@@ -1670,6 +1696,179 @@ async function polishText(text) {
   return out;
 }
 
+/* ------------------------------------------------------------
+   Mes mots et textes tout prêts (Réglages › Texte)
+   - Mes mots : les mots partent à Whisper comme indice (champ « prompt »,
+     seulement Groq et OpenAI : Mistral et Gemini ne le prennent pas), puis
+     « ce qu'il entend » est remplacé par le mot, sur des mots entiers.
+   - Textes tout prêts : une dictée qui n'est QUE le nom (« signature »,
+     « insère ma signature »), ou une phrase à part « Insère ma signature. »
+     dans une dictée plus longue. Jamais un mot dit au milieu d'une phrase.
+   Ordre dans App.finish : nettoyage des sous-titres → mes mots → texte tout
+   prêt seul (rendu tel quel, sans commandes ni nettoyage) → commandes à la
+   voix → texte propre (qui ne voit jamais un texte tout prêt) → insertion.
+   ------------------------------------------------------------ */
+ICONS.plus = '<path d="M5 12h14"/><path d="M12 5v14"/>';
+const HINT_PIDS = ['groq', 'openai']; /* services dont la transcription accepte « prompt » */
+const HINT_MAX_TOKENS = 224; /* limite du prompt de Whisper */
+const SNIP_VERB = '(?:ins[eèé]re|ins[eé]rer|insert)'; /* « insère ma signature » */
+const SNIP_ARTICLE = /^(?:ma|mon|mes|ta|ton|tes|la|le|les|l|my|the) /;
+function wordList() {
+  const w = Array.isArray(Settings.d.words) ? Settings.d.words : [];
+  return w.map(x => ({ word: String(x?.word || '').trim(), heard: String(x?.heard || '').trim() })).filter(x => x.word);
+}
+function snippetList() {
+  const s = Array.isArray(Settings.d.snippets) ? Settings.d.snippets : [];
+  return s.map(x => ({ name: String(x?.name || '').trim(), text: String(x?.text || '').replace(/\r/g, '').trim() })).filter(x => x.name && x.text);
+}
+/* minuscules, sans accents ni ponctuation : « Insère ma Signature ! » → « insere ma signature » */
+const looseText = s => String(s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const snipKey = s => looseText(s).replace(SNIP_ARTICLE, '');
+/* Le prompt de Whisper : les mots dans l'ordre de la liste, entiers, sans dépasser la limite.
+   Estimation prudente : 1 jeton pour 2 octets (les noms propres se découpent mal), + la virgule. */
+function wordsPrompt() {
+  const seen = new Set(), out = [];
+  let tokens = 1;
+  for (const { word } of wordList()) {
+    const k = word.toLowerCase();
+    if (seen.has(k)) continue;
+    const t = Math.ceil(new TextEncoder().encode(word).length / 2) + 1;
+    if (tokens + t > HINT_MAX_TOKENS) break;
+    seen.add(k); tokens += t; out.push(word);
+  }
+  return out.length ? `${out.join(', ')}.` : '';
+}
+/* Whisper recopie parfois son indice quand il n'entend rien : on ne l'écrit pas */
+function dropHintEcho(text, hint) {
+  return hint && hint.includes(',') && looseText(text) === looseText(hint) ? '' : text;
+}
+/* « entendu → écrit », sans tenir compte des majuscules, sur des mots entiers ; le mot lui-même
+   reprend aussi son écriture (« slidefabrik » → « SlideFabrik ») */
+function fixWords(text) {
+  const map = new Map(), key = v => v.trim().toLowerCase().replace(/’/g, '\'').replace(/[\s-]+/g, ' ');
+  for (const { word, heard } of wordList()) {
+    for (const v of heard.split(/[,;\n]/)) { const k = key(v); if (k && !map.has(k)) map.set(k, word); }
+  }
+  for (const { word } of wordList()) { const k = key(word); if (k && !map.has(k)) map.set(k, word); }
+  if (!map.size || !text) return text;
+  const alts = [...map.keys()].sort((a, b) => b.length - a.length)
+    .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, '[\'’]').replace(/ /g, '[\\s-]+'));
+  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${alts.join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
+  return String(text).replace(re, m => map.get(key(m)) ?? m);
+}
+/* Une dictée qui n'est que le nom d'un texte tout prêt (ou « insère » + le nom) : le texte, sinon '' */
+function wholeSnippet(text) {
+  const list = snippetList();
+  if (!list.length) return '';
+  const k = snipKey(looseText(text).replace(/^(?:insere|inserer|insert) /, ''));
+  return (k && list.find(s => snipKey(s.name) === k)?.text) || '';
+}
+/* Les phrases à part « Insère ma signature. » : [{ index, end, text }] */
+function snippetCommands(text) {
+  const list = snippetList(), found = [];
+  if (!list.length || !text) return found;
+  /* la phrase entière : début du texte, d'une ligne ou après une fin de phrase, jusqu'à sa propre fin */
+  const re = new RegExp(`(?<=^|[.!?…][ \\t]*|\\n[ \\t]*)${SNIP_VERB}[ \\t]+([^.!?…\\n]+)(?:[.!?…]+(?=\\s|$)|(?=\\n|$))`, 'giu');
+  for (const m of String(text).matchAll(re)) {
+    const s = list.find(x => snipKey(x.name) === snipKey(m[1]));
+    if (s) found.push({ index: m.index, end: m.index + m[0].length, text: s.text });
+  }
+  return found;
+}
+/* Remplace chaque phrase « Insère … » par son texte : sur sa ligne s'il a plusieurs lignes */
+function insertSnippets(text) {
+  const cmds = snippetCommands(text);
+  if (!cmds.length) return text;
+  let out = '', at = 0, prevMulti = null;
+  const addText = t => {
+    if (prevMulti !== null && t.trim()) { t = t.replace(/^[ \t]+/, ''); if (!/^\n/.test(t)) out += prevMulti ? '\n' : ' '; }
+    out += t;
+  };
+  for (const c of cmds) {
+    addText(text.slice(at, c.index));
+    const multi = c.text.includes('\n');
+    out = out.replace(/[ \t]+$/, '');
+    if (out.trim() && !/\n$/.test(out)) out += multi ? '\n' : ' ';
+    out += c.text; prevMulti = multi; at = c.end;
+  }
+  addText(text.slice(at));
+  return out.trim();
+}
+/* Texte propre : les phrases « Insère … » ne passent pas par le modèle (il pourrait les réécrire) */
+async function polishAround(text) {
+  const cmds = snippetCommands(text);
+  if (!cmds.length) return polishText(text);
+  const parts = [];
+  let at = 0;
+  for (const c of cmds) { parts.push([text.slice(at, c.index), true], [text.slice(c.index, c.end), false]); at = c.end; }
+  parts.push([text.slice(at), true]);
+  let out = '';
+  for (const [t, polish] of parts) {
+    const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(t);
+    out += polish && /\p{L}/u.test(m[2]) ? m[1] + await polishText(m[2]) + m[3] : t;
+  }
+  return out;
+}
+
+/* Réglages › Texte : l'éditeur des deux listes. Ce qu'on tape s'enregistre ; une ligne vide est ignorée. */
+const MotsUI = {
+  saveT: 0,
+  wordRow(w = {}) {
+    return `<li class="mrow"><input class="m-word" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Mot, écrit comme tu le veux" placeholder="Mot (ex. : SlideFabrik)" value="${esc(w.word || '')}">`
+      + `<input class="m-heard" type="text" maxlength="160" autocomplete="off" spellcheck="false" aria-label="Ce que Verbe entend, facultatif" placeholder="Ce qu’il entend (facultatif)" value="${esc(w.heard || '')}">`
+      + `<button class="iconbtn" type="button" data-rm aria-label="Retirer ce mot" title="Retirer">${icon('x', 18)}</button></li>`;
+  },
+  snipRow(s = {}) {
+    return `<li class="mrow mrow-snip"><input class="m-name" type="text" maxlength="40" autocomplete="off" aria-label="Nom du texte" placeholder="Nom (ex. : signature)" value="${esc(s.name || '')}">`
+      + `<button class="iconbtn" type="button" data-rm aria-label="Retirer ce texte" title="Retirer">${icon('x', 18)}</button>`
+      + `<textarea class="m-text" rows="3" maxlength="2000" aria-label="Texte écrit à sa place" placeholder="Le texte écrit à sa place">${esc(s.text || '')}</textarea></li>`;
+  },
+  render() {
+    const wl = $('#words-list'), sl = $('#snips-list');
+    if (!wl) return;
+    const busy = document.activeElement && $('#mots-group').contains(document.activeElement);
+    if (!busy) {
+      wl.innerHTML = (Array.isArray(Settings.d.words) ? Settings.d.words : []).map(w => this.wordRow(w)).join('');
+      sl.innerHTML = (Array.isArray(Settings.d.snippets) ? Settings.d.snippets : []).map(s => this.snipRow(s)).join('');
+    }
+    this.note();
+  },
+  /* au-delà de la limite du prompt, on dit combien de mots Whisper reçoit */
+  note() {
+    const n = wordList().length, sent = wordsPrompt() ? wordsPrompt().split(', ').length : 0, el = $('#words-note');
+    el.hidden = sent >= n;
+    el.textContent = sent < n ? `Whisper reçoit tes ${sent} premiers mots ; les autres sont quand même corrigés.` : '';
+  },
+  save() {
+    clearTimeout(this.saveT);
+    const words = $$('#words-list .mrow').map(r => ({ word: $('.m-word', r).value.trim(), heard: $('.m-heard', r).value.trim() })).filter(w => w.word);
+    const snippets = $$('#snips-list .mrow').map(r => ({ name: $('.m-name', r).value.trim(), text: $('.m-text', r).value.replace(/\r/g, '').trim() })).filter(s => s.name && s.text);
+    Settings.d.words = words; Settings.d.snippets = snippets; Settings.save();
+    this.note();
+  },
+  add(list, html, field) {
+    const ul = $(list), rows = $$('.mrow', ul), last = rows[rows.length - 1];
+    if (last && !$(field, last).value.trim()) { $(field, last).focus(); return; } /* une ligne vide attend déjà */
+    ul.insertAdjacentHTML('beforeend', html);
+    $(field, ul.lastElementChild).focus();
+  },
+  bind() {
+    const g = $('#mots-group');
+    if (!g) return;
+    g.addEventListener('input', () => { clearTimeout(this.saveT); this.saveT = setTimeout(() => this.save(), 300); });
+    g.addEventListener('change', () => this.save());
+    g.addEventListener('click', e => {
+      const rm = e.target.closest('[data-rm]');
+      if (!rm) return;
+      const row = rm.closest('.mrow'), next = row.nextElementSibling || row.previousElementSibling, ul = row.parentElement;
+      row.remove(); this.save();
+      (next ? $('input', next) : $('button', ul.parentElement))?.focus();
+    });
+    $('#btn-word-add').addEventListener('click', () => this.add('#words-list', this.wordRow(), '.m-word'));
+    $('#btn-snip-add').addEventListener('click', () => this.add('#snips-list', this.snipRow(), '.m-name'));
+  },
+};
+
 const OK_EXT = ['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'wav', 'webm'];
 const MIME_OF = { webm: 'audio/webm', ogg: 'audio/ogg', m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg', mpeg: 'audio/mpeg', mpga: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac' };
 function extOf(name, type) {
@@ -1752,6 +1951,7 @@ async function httpError(res, P) {
 async function callProvider(pid, seg, { key, model, lang, signal }) {
   const P = PROVIDERS[pid];
   let res;
+  const hint = P.kind === 'openai' && HINT_PIDS.includes(pid) ? wordsPrompt() : ''; /* Mes mots */
   try {
     if (P.kind === 'openai') {
       const fd = new FormData();
@@ -1762,6 +1962,7 @@ async function callProvider(pid, seg, { key, model, lang, signal }) {
         else fd.append('language', lang);
       }
       if (pid === 'groq') { fd.append('response_format', 'json'); fd.append('temperature', '0'); }
+      if (hint) fd.append('prompt', hint);
       res = await fetch(P.url, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: fd, signal });
     } else {
       const data = await blobToBase64(seg.blob);
@@ -1779,7 +1980,7 @@ async function callProvider(pid, seg, { key, model, lang, signal }) {
   if (!res.ok) throw await httpError(res, P);
   const j = await res.json().catch(() => null);
   if (!j) throw userError('bad-response', `${P.name} a renvoyé une réponse illisible.`, 'Réessaie dans un instant.');
-  if (P.kind === 'openai') return String(j.text || '');
+  if (P.kind === 'openai') return dropHintEcho(String(j.text || ''), hint);
   const parts = j.candidates?.[0]?.content?.parts || [];
   if (!parts.length && j.promptFeedback?.blockReason) throw userError('blocked', 'Gemini a refusé cet audio.', 'Essaie un autre service.');
   return parts.map(p => p.text || '').join('');
@@ -2743,13 +2944,19 @@ const App = {
 
   async finish(item, rawText, tStop) {
     let text = cleanTranscript(rawText);
-    if (text && Settings.d.voiceCmds) text = applyVoiceCommands(text);
+    /* Mes mots d'abord : les commandes et le texte propre voient les bons mots. Une dictée qui n'est
+       que le nom d'un texte tout prêt donne ce texte tel quel, sans commandes ni nettoyage. */
+    text = fixWords(text);
+    const ready = wholeSnippet(text);
+    if (ready) text = ready;
+    if (text && Settings.d.voiceCmds && !ready) text = applyVoiceCommands(text);
     /* texte propre automatique : en cas de souci, on garde le texte brut */
-    if (text && Settings.d.autoClean && polishProvider()) {
+    if (text && Settings.d.autoClean && !ready && polishProvider()) {
       Island.setRight('Nettoyage…');
-      try { const clean = await polishText(text); item.raw = text; text = clean; }
+      try { const clean = await polishAround(text); item.raw = text; text = clean; }
       catch (e) { console.warn('[Verbe] nettoyage', e); Toast.show({ type: 'warn', text: e?.user?.text || 'Nettoyage impossible.', sub: 'Ton texte brut est gardé et copié.' }); }
     }
+    if (!ready) text = insertSnippets(text); /* « Insère ma signature. » dans une dictée plus longue */
     if (!text) {
       item.status = 'error'; item.error = 'Aucune parole reconnue.';
       await this.saveItem(item);
@@ -3031,6 +3238,7 @@ const UI = {
     for (const b of $$('#theme-seg button')) b.setAttribute('aria-pressed', String(b.dataset.value === theme));
     this.renderMics();
     this.renderQuota();
+    MotsUI.render();
     this.renderRegNav();
   },
 
@@ -3412,6 +3620,7 @@ function bind() {
     if (grp.dataset.setting === 'islandPos' || grp.dataset.setting === 'islandStyle') App.preview();
     UI.renderSettings();
   });
+  MotsUI.bind();
   for (const sw of $$('[data-switch]')) sw.addEventListener('click', () => { const k = sw.dataset.switch; Settings.set(k, !Settings.d[k]); sw.setAttribute('aria-checked', String(Settings.d[k])); UI.renderRegNav(); });
   /* sections des réglages : on change de section sans recharger la page */
   $('.reg-nav').addEventListener('click', e => {
@@ -3534,6 +3743,7 @@ function init() {
   Mics.refresh().then(() => { UI.renderMics(); UI.renderChips(); });
   if (Desktop) wireDesktop();
   window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
+  Object.assign(window.Verbe, { fixWords, wordsPrompt, wholeSnippet, insertSnippets }); /* Mes mots, pour les tests */
 }
 init();
 }

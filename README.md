@@ -38,7 +38,7 @@ des compteurs de limite.
 ## Réglages
 
 Une section à la fois : Transcription (service, clé, langue, **ce qu'il te reste**), Micro, Raccourci,
-Texte (commandes à la voix, texte propre, collage), Bulle (forme Barres / Onde / Points dessinée
+Texte (commandes à la voix, texte propre, collage, mes mots, textes tout prêts), Bulle (forme Barres / Onde / Points dessinée
 en ligne de part et d’autre du micro, position en bas par défaut, sons, aperçu) et Général (apparence, lancement avec Windows, audio gardé, historique).
 
 ## Commandes à la voix
@@ -46,6 +46,21 @@ en ligne de part et d’autre du micro, position en bas par défaut, sons, aper�
 « virgule », « point final », « point à la ligne », « nouvelle ligne », « nouveau paragraphe »,
 « point d'interrogation », « point d'exclamation », « point-virgule »,
 « ouvrez les guillemets » / « fermez les guillemets », « efface ça » (retire la phrase d'avant).
+
+## Mes mots et textes tout prêts
+
+Dans **Réglages › Texte**, deux listes : ajouter, modifier, retirer (une ligne vide est ignorée).
+
+- **Mes mots** : noms propres et jargon (SlideFabrik, Groq, Granby…). Ils partent à Whisper comme indice
+  (champ `prompt`, Groq et OpenAI seulement ; limité à environ 224 jetons, les premiers mots de la liste d'abord).
+  « Ce qu'il entend » (ex. « slide fabrique ») est remplacé par le mot, sans tenir compte des majuscules
+  et sur des mots entiers seulement (« slide fabriques » ne bouge pas). Plusieurs façons : sépare-les par des virgules.
+- **Textes tout prêts** : un nom court donne un texte (signature, courriel, formule de politesse, sur plusieurs lignes au besoin).
+  Il se déclenche seulement si la dictée n'est **que** son nom (« Signature. », « Insère ma signature. »),
+  ou par une phrase à part qui commence par « insère » (« Merci. Insère ma signature. »).
+  Un nom dit au milieu d'une phrase (« je mets ma signature en bas ») n'est jamais remplacé.
+- Ordre après la transcription : mes mots → texte tout prêt seul (rendu tel quel) → commandes à la voix
+  → texte propre (il ne voit jamais un texte tout prêt) → insertion des « Insère … ».
 
 ## Ce qu'il te reste (limites du service)
 
@@ -80,7 +95,7 @@ npm run test:bureau               # l'app Electron (Windows)
 ```
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
-  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
+  « Nettoyer », mes mots et textes tout prêts, Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
   presse-papiers rendu après le collage.
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
