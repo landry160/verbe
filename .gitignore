@@ -4,3 +4,7 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# résultats des tests (traces, captures en cas d’échec)
+test-results/
+playwright-report/

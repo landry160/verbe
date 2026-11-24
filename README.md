@@ -1,5 +1,7 @@
 # Verbe : dictée vocale
 
+[![Tests](https://github.com/landry160/verbe/actions/workflows/tests.yml/badge.svg)](https://github.com/landry160/verbe/actions/workflows/tests.yml)
+
 Parle, c'est écrit, puis collé là où tu écris.
 
 ![La bulle de Verbe écoute, en bas de l'écran, pendant qu'un courriel s'écrit](docs/verbe-bulle.webp)
@@ -16,7 +18,7 @@ Voir aussi `VISION.md` : ce que Verbe veut être, et ce qui ne doit pas changer.
 
 | | Version web | Version bureau (Windows) |
 |---|---|---|
-| Ouvrir | `app/verbe.html` dans Chrome ou Edge (ou en ligne, une fois publiée) | **Verbe** sur le Bureau ou dans le menu Démarrer |
+| Ouvrir | https://landry160.github.io/verbe/ dans Chrome ou Edge (ou `app/verbe.html`) | **Verbe** sur le Bureau ou dans le menu Démarrer |
 | Ctrl + Maj + L | seulement quand Verbe est la fenêtre active | **dans toutes les apps** (Word, Teams, Claude…) |
 | Indicateur | pastille dans la page, ou mini-fenêtre de Chrome | **bulle** sans cadre, micro rond au centre (en bas par défaut) |
 | Après la dictée | texte copié, tu fais Ctrl + V | texte **collé tout seul** là où tu écrivais |
@@ -68,6 +70,26 @@ npm run installateur   # construit dist\Verbe-Setup-<version>.exe
   `winCodeSign-2.6.0` avec `node_modules\7zip-bin\win\x64\7za.exe x … -o…` (les 2 erreurs sur des fichiers Mac sont sans effet), puis relancer.
 - L'installateur n'est pas signé : Windows affiche « Windows a protégé votre ordinateur » → « Informations complémentaires » → « Exécuter quand même ».
 
+## Tests
+
+```
+npx playwright install chromium   # une fois : le navigateur des tests
+npm test                          # tout (la partie bureau seulement sous Windows)
+npm run test:web                  # la page servie comme sur GitHub Pages, dans Chromium
+npm run test:bureau               # l'app Electron (Windows)
+```
+
+- **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
+  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
+- **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
+  presse-papiers rendu après le collage.
+- Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
+  Le micro est un faux micro de Chromium qui joue un son continu.
+- Rien de personnel n'est touché : la version bureau tourne dans un profil à part (`--profil=`),
+  aucune dictée ni aucun collage réel n'a lieu, et le presse-papiers est remis tel quel à la fin.
+- Sur GitHub, chaque envoi sur `main` lance les deux séries (`.github/workflows/tests.yml`) :
+  la version web sous Linux, la version bureau sous Windows.
+
 ## Publier une version
 
 1. Monter la version dans `package.json` (et le pied de Réglages › Général), puis `npm run installateur`.
@@ -78,5 +100,7 @@ npm run installateur   # construit dist\Verbe-Setup-<version>.exe
 
 ## Licences
 
+- Code de Verbe : licence **MIT** (`LICENSE`). Tu peux le réutiliser, le modifier et le redistribuer,
+  en gardant la mention de l'auteur.
 - Police **Inter** : SIL Open Font License 1.1 (`app/fonts/OFL.txt`).
 - Icônes : **Lucide** (licence ISC, `app/LICENCE-lucide.txt`), intégrées dans `app/verbe.html`.

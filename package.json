@@ -4,14 +4,19 @@
   "version": "0.4.5",
   "description": "Verbe : dictée vocale. Raccourci partout, bulle ronde, collage automatique.",
   "author": "Landry Tchuente Tchouela",
+  "license": "MIT",
   "main": "bureau/main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "raccourci": "node bureau/installer-raccourci.js",
-    "installateur": "electron-builder --win nsis --x64"
+    "installateur": "electron-builder --win nsis --x64",
+    "test": "playwright test",
+    "test:web": "playwright test --project=web",
+    "test:bureau": "playwright test --project=bureau"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "electron": "33.2.1",
     "electron-builder": "25.1.8"
   },

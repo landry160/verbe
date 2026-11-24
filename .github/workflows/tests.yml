@@ -1,0 +1,65 @@
+# Tests de Verbe à chaque envoi : la version web sous Linux (Chromium), la version bureau sous Windows (Electron).
+# Groq est simulé : aucun secret n'est nécessaire et rien ne part vers un vrai service.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Version web (Chromium, Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer les dépendances (sans Electron)
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Installer Chromium pour les tests
+        run: npx playwright install --with-deps chromium
+      - name: Tests de la version web
+        run: npx playwright test --project=web
+      - name: Garder les traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traces-web
+          path: test-results/
+          retention-days: 7
+
+  bureau:
+    name: Version bureau (Electron, Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer les dépendances (avec Electron)
+        run: npm ci
+      - name: Tests de la version bureau
+        run: npx playwright test --project=bureau
+      - name: Garder les traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traces-bureau
+          path: test-results/
+          retention-days: 7
