@@ -236,10 +236,16 @@ async function testKey() {
 }
 
 async function loadHistory({ quiet = false } = {}) {
+  /* deux lectures peuvent se croiser (la bulle dicte pendant que la fenêtre principale démarre) :
+     seule la plus récente compte, sinon une lecture lente remettait une liste périmée (v0.6.1) */
+  let tour = (App.histTour = (App.histTour || 0) + 1);
   /* quiet : rechargé parce que l'autre fenêtre (bureau) a écrit ; une dictée
      « en cours » l'est vraiment, on n'y touche pas */
   if (quiet && Store.db) {
-    try { App.items = await Store.all(); } catch (e) { return; }
+    let items;
+    try { items = await Store.all(); } catch (e) { return; }
+    if (tour !== App.histTour) return; /* une lecture plus récente s'en charge */
+    App.items = items;
     const lastId = App.last?.id;
     App.last = App.items.find(i => i.status === 'ok') || null;
     if (App.last?.id !== lastId || document.activeElement?.id !== 'last-text') UI.renderLast();
@@ -250,7 +256,10 @@ async function loadHistory({ quiet = false } = {}) {
   App.loadState = 'loading'; UI.renderHistory();
   try {
     if (!Store.db && !Store.mem) await Store.open();
-    App.items = await Store.all();
+    let items = await Store.all();
+    /* une écriture de l'autre fenêtre est arrivée pendant la lecture : on relit, pour ne pas garder l'ancienne liste */
+    while (tour !== App.histTour) { tour = App.histTour; items = await Store.all(); }
+    App.items = items;
     App.loadState = 'ready';
   } catch (e) {
     console.warn('[Verbe] IndexedDB indisponible', e);
@@ -354,8 +363,9 @@ function wireUpdates() {
    Réglages › Général › « Nouveautés » la rouvre. À chaque version :
    monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
    ------------------------------------------------------------ */
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 const NOUVEAUTES = [
+  { v: '0.6.1', icon: 'history', desk: true, title: 'L’historique toujours à jour', text: 'Une dictée faite juste après l’ouverture de Verbe apparaît maintenant à coup sûr dans l’historique de la fenêtre.' },
   { v: '0.6.0', icon: 'sparkles', title: 'Des transcriptions plus propres', text: 'Quand Whisper invente « Sous-titres réalisés par Amara.org » sur un silence, Verbe retire maintenant la phrase en entier.' },
   { v: '0.5.3', icon: 'mic', desk: true, title: 'La bulle descend', text: 'En bas, elle se pose juste au-dessus de la barre des tâches, plus loin de ce que tu écris.' },
   { v: '0.5.2', icon: 'audioLines', desk: true, title: 'La même voix partout', text: 'Pendant la dictée, la fenêtre de Verbe montre la même pastille que la bulle, à la place du micro.' },

@@ -28,7 +28,7 @@ function init() {
   addEventListener('storage', e => { if (e.key === STATS_KEY || e.key == null) UI.renderProgress(); });
   window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
   Object.assign(window.Verbe, { silenceSpans, trimSilences, TRIM }); /* silences coupés avant l'envoi */
-  Object.assign(window.Verbe, { News, NOUVEAUTES, VERSION }); /* nouveautés (tests) */
+  Object.assign(window.Verbe, { News, NOUVEAUTES, VERSION, loadHistory }); /* nouveautés, historique (tests) */
   window.Verbe.Stats = Stats; /* progrès, pour les tests */
   Object.assign(window.Verbe, { fixWords, wordsPrompt, wholeSnippet, insertSnippets }); /* Mes mots, pour les tests */
   Object.assign(window.Verbe, { appCategory, llmPlan, llmPrompt }); /* traduction et ton selon l'app (tests) */

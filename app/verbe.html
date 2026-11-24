@@ -4614,12 +4614,16 @@ async function testKey() {
 	}
 }
 async function loadHistory({ quiet = false } = {}) {
+	let tour = App.histTour = (App.histTour || 0) + 1;
 	if (quiet && Store.db) {
+		let items;
 		try {
-			App.items = await Store.all();
+			items = await Store.all();
 		} catch (e) {
 			return;
 		}
+		if (tour !== App.histTour) return;
+		App.items = items;
 		const lastId = App.last?.id;
 		App.last = App.items.find((i) => i.status === "ok") || null;
 		if (App.last?.id !== lastId || document.activeElement?.id !== "last-text") UI.renderLast();
@@ -4632,7 +4636,12 @@ async function loadHistory({ quiet = false } = {}) {
 	UI.renderHistory();
 	try {
 		if (!Store.db && !Store.mem) await Store.open();
-		App.items = await Store.all();
+		let items = await Store.all();
+		while (tour !== App.histTour) {
+			tour = App.histTour;
+			items = await Store.all();
+		}
+		App.items = items;
 		App.loadState = "ready";
 	} catch (e) {
 		console.warn("[Verbe] IndexedDB indisponible", e);
@@ -4767,8 +4776,15 @@ function wireUpdates() {
 	$("#maj-verifier").addEventListener("click", () => Desktop.checkUpdate().then(render));
 	$("#maj-redemarrer").addEventListener("click", () => Desktop.installUpdate());
 }
-var VERSION = "0.6.0";
+var VERSION = "0.6.1";
 var NOUVEAUTES = [
+	{
+		v: "0.6.1",
+		icon: "history",
+		desk: true,
+		title: "L’historique toujours à jour",
+		text: "Une dictée faite juste après l’ouverture de Verbe apparaît maintenant à coup sûr dans l’historique de la fenêtre."
+	},
 	{
 		v: "0.6.0",
 		icon: "sparkles",
@@ -4965,7 +4981,8 @@ function init() {
 	Object.assign(window.Verbe, {
 		News,
 		NOUVEAUTES,
-		VERSION
+		VERSION,
+		loadHistory
 	});
 	window.Verbe.Stats = Stats;
 	Object.assign(window.Verbe, {
@@ -6105,7 +6122,7 @@ body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v<span id="app-version">0.6.0</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
+          <p class="foot">Verbe v<span id="app-version">0.6.1</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
         </section>
 
       </div>
