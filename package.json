@@ -8,17 +8,24 @@
   "main": "bureau/main.js",
   "private": true,
   "scripts": {
-    "start": "electron .",
+    "dev": "vite",
+    "build": "vite build",
+    "start": "vite build && electron .",
     "raccourci": "node bureau/installer-raccourci.js",
-    "installateur": "electron-builder --win nsis --x64 --publish never",
+    "installateur": "vite build && electron-builder --win nsis --x64 --publish never",
+    "pretest": "vite build",
     "test": "playwright test",
-    "test:web": "playwright test --project=web",
-    "test:bureau": "playwright test --project=bureau"
+    "test:web": "vite build && playwright test --project=web",
+    "test:bureau": "vite build && playwright test --project=bureau"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
     "electron": "33.2.1",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "typescript": "7.0.2",
+    "vite": "8.3.7",
+    "vite-plugin-singlefile": "2.3.4",
+    "vitest": "5.1.0"
   },
   "build": {
     "appId": "com.landrytchouela.verbe",
