@@ -999,8 +999,12 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="tone-label" aria-describedby="tone-help" data-switch="toneByApp"></button></div>
             </div>
             <div class="srow desk-only">
-              <div class="srow-t"><span class="flabel" id="paste-label">Coller automatiquement</span><p class="help">Le texte arrive tout seul là où tu écrivais, puis ce que tu avais copié revient dans le presse-papiers.</p></div>
+              <div class="srow-t"><span class="flabel" id="paste-label">Coller automatiquement</span><p class="help">Le texte arrive tout seul là où tu écrivais.</p></div>
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="paste-label" data-switch="autoPaste"></button></div>
+            </div>
+            <div class="srow desk-only">
+              <div class="srow-t"><span class="flabel" id="keepclip-label">Garder la dictée dans le presse-papiers</span><p class="help">Si le texte part au mauvais endroit, <kbd>Ctrl</kbd> <kbd>V</kbd> le colle ailleurs. Coupé : ce que tu avais copié avant revient une seconde après.</p></div>
+              <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="keepclip-label" data-switch="keepClip"></button></div>
             </div>
             <div class="srow web-only">
               <div class="srow-t"><span class="flabel" id="copy-label">Copier automatiquement</span><p class="help">Le texte va dans le presse-papiers dès qu’il est prêt.</p></div>
@@ -1260,6 +1264,8 @@ const DEFAULTS = {
   scV: 2,
   fixV: 1,
   posV: 1,
+  clipV: 1,
+  keepClip: true, /* la dictée reste dans le presse-papiers après le collage (demande du 24 nov.) */
   voiceCmds: true,
   autoClean: false,
   pasteLang: 'same', /* « Coller en » : 'same' = comme je parle, sinon la langue de la traduction (fr, en, es) */
@@ -1268,7 +1274,7 @@ const DEFAULTS = {
   autoStop: '20', /* secondes sans voix avant l'arrêt automatique ; '0' = jamais */
   /* bureau : Recoller la dernière dictée et Réécrire la sélection, deux raccourcis globaux éteints
      par défaut (ils voleraient leur combinaison dans toutes les apps) ; la combinaison est proposée */
-  repasteSc: { on: false, ctrl: true, shift: true, alt: false, meta: false, code: 'Digit9', key: '9' },
+  repasteSc: { on: true, ctrl: true, shift: true, alt: false, meta: false, code: 'Digit9', key: '9' }, /* allumé par défaut (demande du 24 nov.) */
   rewriteSc: { on: false, ctrl: true, shift: true, alt: false, meta: false, code: 'Digit7', key: '7' },
   llm: {},
   words: [], /* Mes mots : [{ word: 'SlideFabrik', heard: 'slide fabrique' }] */
@@ -1335,6 +1341,8 @@ const Settings = {
     /* 24 nov. : la bulle et la pastille se placent en bas au centre par défaut ; une seule fois,
        « Centre » enregistré par l'ancien défaut devient « Bas » (un choix fait ensuite est respecté) */
     if (saved && (s.posV || 0) < 1) { if (this.d.islandPos === 'center') this.d.islandPos = 'bottom'; this.d.posV = 1; this.save(); }
+    /* v0.5.1 : « Recoller la dernière dictée » allumé par défaut ; une seule fois pour les réglages déjà là */
+    if (saved && (s.clipV || 0) < 1) { this.d.repasteSc = Object.assign({}, this.d.repasteSc, { on: true }); this.d.clipV = 1; this.save(); }
     if (Desktop && saved && (s.fixV || 0) < 1) {
       const k = this.d.shortcut;
       if (k.code === 'KeyK' && k.ctrl && k.shift && !k.alt && !k.meta) this.d.shortcut = Object.assign({}, DEFAULTS.shortcut);
@@ -2661,7 +2669,7 @@ const Island = {
       this.l.innerHTML = `<span class="okc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>`;
       const words = String(data.text || '').split(/\s+/).filter(Boolean).slice(0, 14);
       this.t.innerHTML = words.map((w, i) => `<span class="w" style="--i:${i}">${esc(w)}</span>`).join(' ');
-      this.s.textContent = data.note ? data.note : data.preview ? 'Aperçu : rien n’a été copié' : data.sub ? data.sub : data.pasted ? 'Collé là où tu écrivais' : data.copied ? copiedLine() : (COARSE.matches ? 'Touche ici pour copier le texte' : 'Clique ici pour copier le texte');
+      this.s.textContent = data.note ? data.note : data.preview ? 'Aperçu : rien n’a été copié' : data.sub ? data.sub : data.pasted ? pastedLine() : data.copied ? copiedLine() : (COARSE.matches ? 'Touche ici pour copier le texte' : 'Clique ici pour copier le texte');
       this.s.classList.add('fade');
       this.r.textContent = data.words ? plural(data.words, 'mot', 'mots') : '';
     }
@@ -2999,6 +3007,12 @@ function activeWin() {
 const COARSE = window.matchMedia('(pointer: coarse)');
 const pasteHint = () => (IS_MAC ? '⌘ V' : 'Ctrl + V');
 /* Sur un écran tactile, pas de raccourci clavier à suggérer */
+/* après un collage : comment le remettre ailleurs si le texte est parti au mauvais endroit */
+function pastedLine() {
+  if (Settings.d.keepClip !== false) return 'Collé · Ctrl + V pour le recoller ailleurs';
+  if (Desktop && Settings.d.repasteSc?.on) return `Collé · ${UI.scLabel(Settings.d.repasteSc).join(' + ')} pour le recoller`;
+  return 'Collé là où tu écrivais';
+}
 const copiedLine = () => (COARSE.matches ? 'Copié · prêt à coller' : `Copié · ${pasteHint()} pour coller`);
 const pasteSub = () => (COARSE.matches ? 'Prêt à coller.' : `Colle-le avec ${pasteHint()}.`);
 async function copyText(text) {
@@ -3273,7 +3287,7 @@ const App = {
     Stats.add(item); /* progrès : compté une seule fois, avant l'enregistrement qui prévient l'autre fenêtre */
     const copied = Settings.d.autoCopy || IS_BUBBLE ? await copyText(text) : false;
     /* bureau : le texte se colle tout seul dans l'app où tu écrivais */
-    const pasted = IS_BUBBLE && copied && Settings.d.autoPaste ? await Desktop.paste().catch(() => false) : false;
+    const pasted = IS_BUBBLE && copied && Settings.d.autoPaste ? await Desktop.paste({ keep: Settings.d.keepClip !== false }).catch(() => false) : false;
     item.latencyMs = Math.round(now() - tStop);
     await this.saveItem(item);
     this.last = item; UI.renderLast();
@@ -3360,7 +3374,7 @@ const App = {
     const it = this.items.find(i => i.status === 'ok' && i.text);
     if (!it) { Island.show('warn', { text: 'Rien à recoller pour l’instant.', hint: 'Dicte d’abord un texte.', autoHide: 3600 }); Sound.play('error'); return; }
     const copied = await copyText(it.text);
-    const pasted = copied ? await Desktop.paste().catch(() => false) : false;
+    const pasted = copied ? await Desktop.paste({ keep: Settings.d.keepClip !== false }).catch(() => false) : false;
     Island.show('done', { text: it.text, copied, pasted, words: it.words || countWords(it.text), autoHide: copied ? 2600 : 6000 });
   },
 

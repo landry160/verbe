@@ -37,6 +37,8 @@ test('rien entendu du tout : Verbe s’arrête sans rien envoyer et le dit', asy
   await page.evaluate(() => window.Verbe.App.toggle());
   await attendreEtat(page, 'recording');
   await couperLeSon(page);
+  // les trames déjà en route arrivent encore un instant : on attend le vrai silence avant d'oublier la voix
+  await page.waitForFunction(() => { const f = window.Verbe.Rec.frames; return f.length > 5 && f.slice(-5).every(d => d < -46); }, null, { timeout: 5000 });
   await page.evaluate(() => { window.Verbe.Rec.voiced = 0; }); // oublie le son entendu avant la coupure
   await attendreEtat(page, 'idle', 6000);
   expect(await micLibere(page)).toBe(true);

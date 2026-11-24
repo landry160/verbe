@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('verbeDesktop', {
   mouse: inside => ipcRenderer.send('verbe:mouse', !!inside),
   openMain: hash => ipcRenderer.send('verbe:open-main', String(hash || '')),
   copy: text => ipcRenderer.invoke('verbe:copy', String(text)),
-  paste: () => ipcRenderer.invoke('verbe:paste'),
+  paste: opts => ipcRenderer.invoke('verbe:paste', opts || {}),
   setShortcut: accel => ipcRenderer.invoke('verbe:shortcut', String(accel)),
   /* Recoller et Réécrire : name = « repaste » ou « rewrite » ; accel vide = éteint */
   setAction: (name, accel) => ipcRenderer.invoke('verbe:action-shortcut', String(name), String(accel || '')),

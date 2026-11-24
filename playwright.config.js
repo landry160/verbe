@@ -77,6 +77,8 @@ const bureau = { name: 'bureau', testDir: 'tests/bureau' };
 module.exports = defineConfig({
   testDir: 'tests',
   fullyParallel: true,
+  // en local, la suite fait tourner Chromium et Electron en même temps : au-delà de 6, le faux micro prend du retard
+  workers: process.env.CI ? undefined : 6,
   forbidOnly: !!process.env.CI, // un test.only oublié fait échouer la CI
   retries: 0, // un test instable se corrige ; on ne le rejoue pas en espérant qu'il passe
   timeout: 60_000,

@@ -321,10 +321,13 @@ ipcMain.on('verbe:preview', () => bubble?.webContents.send('verbe:preview'));
 ipcMain.on('verbe:mouse', (e, inside) => bubble?.setIgnoreMouseEvents(!inside, { forward: true }));
 ipcMain.on('verbe:open-main', (e, hash) => showMain(hash));
 ipcMain.handle('verbe:copy', (e, text) => { saveClipboard(); clip.writeText(text); return true; });
-ipcMain.handle('verbe:paste', async () => {
+ipcMain.handle('verbe:paste', async (e, opts) => {
   await new Promise(r => setTimeout(r, 40));
   const ok = sendPaste();
-  if (ok) restoreClipboard(clip.readText()); /* une seconde après, ce que tu avais copié revient */
+  /* par défaut la dictée reste dans le presse-papiers (Ctrl + V la recolle ailleurs) ;
+     sinon, une seconde après, ce que tu avais copié revient */
+  if (ok && !(opts && opts.keep)) restoreClipboard(clip.readText());
+  else savedClip = null;
   return ok;
 });
 ipcMain.handle('verbe:shortcut', (e, a) => setShortcut(a));

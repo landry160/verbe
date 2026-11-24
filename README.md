@@ -39,21 +39,28 @@ des compteurs de limite.
    de l'icône près de l'horloge) l'installe tout de suite. L'interrupteur « Mises à jour automatiques » (actif par défaut) et
    le bouton « Vérifier maintenant » sont dans Réglages › Général. La version web, elle, est toujours à jour.
 
-### Deux raccourcis de plus (à allumer dans Réglages › Raccourci)
+### Le texte est parti au mauvais endroit ?
 
-- **Recoller la dernière dictée** (proposé : **Ctrl + Maj + 9**) : le texte est parti dans la mauvaise
-  fenêtre ? Clique au bon endroit et fais le raccourci : la dernière dictée y est collée.
+Après chaque dictée, le texte **reste dans le presse-papiers** : clique au bon endroit et fais **Ctrl + V**.
+La bulle le rappelle (« Collé · Ctrl + V pour le recoller ailleurs »). Pour retrouver plutôt ce que tu avais
+copié avant, coupe « Garder la dictée dans le presse-papiers » (Réglages › Texte) : il revient une seconde
+après le collage, et **Ctrl + Maj + 9** recolle la dernière dictée.
+
+### Deux raccourcis de plus (Réglages › Raccourci)
+
+- **Recoller la dernière dictée** (**Ctrl + Maj + 9**, allumé par défaut) : le texte est parti dans la mauvaise
+  fenêtre ? Clique au bon endroit et fais le raccourci : la dernière dictée y est collée, même si tu as copié autre chose depuis.
 - **Réécrire la sélection** (proposé : **Ctrl + Maj + 7**) : sélectionne un texte dans n'importe quelle app,
   fais le raccourci, dis la consigne (« plus poli », « plus court », « en anglais », « corrige les fautes »),
   puis refais le raccourci (ou Ctrl + Maj + L, ou tais-toi : l'arrêt automatique). Verbe remplace la
   sélection par la version réécrite. Il utilise la clé déjà donnée (même modèle que le texte propre) ;
   le texte sélectionné n'est jamais pris pour une consigne.
-- Les deux sont **éteints par défaut** : un raccourci global vole sa combinaison dans toutes les apps, et
+- Réécrire est **éteint par défaut** (Recoller est allumé, sur une combinaison sans conflit) : un raccourci global vole sa combinaison dans toutes les apps, et
   aucune lettre n'est libre avec Ctrl + Maj (Word, Teams, VS Code ou Edge en prennent chacune). Les chiffres
   7 et 9 ne sont pris que par Excel ; 8 affiche les ¶ dans Word. Pas de Ctrl + Alt : c'est AltGr sur un clavier canadien.
 - « Modifier » les change comme le raccourci principal. Une combinaison déjà prise par un autre raccourci
   de Verbe est refusée ; une combinaison déjà prise par une autre app est signalée.
-- Ce que tu avais copié revient dans le presse-papiers après le collage, ou tout de suite si tu annules.
+- Après une réécriture, ce que tu avais copié revient dans le presse-papiers (ou tout de suite si tu annules).
   Ces raccourcis n'existent pas dans la version web (le bouton Copier suffit).
 
 ## Réglages

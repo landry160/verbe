@@ -62,7 +62,7 @@ test('une dictée suivie de silence : l’audio envoyé est bien plus court, le 
   expect(groq.envois).toHaveLength(1);
   const envoye = audioEnvoye(groq.envois[0]);
   expect(envoye.wav, 'ré-encodé en WAV après la coupe').toBe(true);
-  expect(item.durationMs / 1000).toBeGreaterThan(5);
+  expect(item.durationMs / 1000).toBeGreaterThan(4.5); // 1,2 s de voix + 4 s de silence, à quelques trames près
   expect(envoye.sec, 'la voix est envoyée').toBeGreaterThan(1);
   expect(envoye.sec, 'le silence de la fin ne part pas').toBeLessThan(item.durationMs / 1000 - 3);
 

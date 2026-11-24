@@ -94,25 +94,25 @@ test('mode essai : aucun raccourci pris à Windows, le faux micro de Chromium, u
   expect(micro).toMatch(/fake/i);
 });
 
-test('Recoller et Réécrire sont éteints par défaut, et s’allument dans Réglages › Raccourci', async () => {
+test('Recoller est allumé par défaut, Réécrire s’allume dans Réglages › Raccourci', async () => {
   const d = await principale.evaluate(() => ({ r: window.Verbe.Settings.d.repasteSc, w: window.Verbe.Settings.d.rewriteSc }));
-  expect([d.r.on, d.w.on]).toEqual([false, false]);
-  expect(await essai(e => [...e.raccourcis.keys()])).not.toContain(RECOLLER);
+  expect([d.r.on, d.w.on]).toEqual([true, false]);
+  await expect.poll(() => essai(e => [...e.raccourcis.keys()])).toContain(RECOLLER);
+  expect(await essai(e => [...e.raccourcis.keys()])).not.toContain(REECRIRE);
 
   await principale.evaluate(() => { location.hash = '#reglages/raccourci'; });
   const groupe = principale.locator('#sc-actions');
   await expect(groupe).toBeVisible();
   await expect(groupe.locator('[data-act-sc="repaste"]')).toHaveText(/Ctrl\s*Maj\s*9/);
   await expect(groupe.locator('[data-act-sc="rewrite"]')).toHaveText(/Ctrl\s*Maj\s*7/);
-  for (const nom of ['repaste', 'rewrite']) {
-    await principale.click(`[data-act-on="${nom}"]`);
-    await expect(principale.locator(`[data-act-on="${nom}"]`)).toHaveAttribute('aria-checked', 'true');
-  }
+  await expect(principale.locator('[data-act-on="repaste"]')).toHaveAttribute('aria-checked', 'true');
+  await principale.click('[data-act-on="rewrite"]');
+  await expect(principale.locator('[data-act-on="rewrite"]')).toHaveAttribute('aria-checked', 'true');
   await expect.poll(() => essai(e => [...e.raccourcis.keys()].sort())).toEqual(['Control+Shift+7', 'Control+Shift+9', 'Control+Shift+L']);
   await expect(principale.locator('[data-sum="raccourci"]')).toHaveText(/Recoller · Réécrire/);
 });
 
-test('recoller : la dernière dictée est collée encore une fois, puis ce que tu avais copié revient', async () => {
+test('recoller : la dernière dictée est collée encore une fois, et reste dans le presse-papiers', async () => {
   // une dictée d'il y a une heure dans l'historique : c'est la plus récente qu'on doit recoller
   await bulle.evaluate(() => window.Verbe.Store.put({ id: 'vieille', createdAt: Date.now() - 3600e3, text: 'Une vieille dictée.', status: 'ok', error: '', source: 'micro', durationMs: 1000, words: 3, hasAudio: false }));
   // une vraie dictée (faux micro, Groq simulé), collée par le faux Ctrl+V
@@ -125,15 +125,46 @@ test('recoller : la dernière dictée est collée encore une fois, puis ce que t
   await expect.poll(() => essai(e => e.collages)).toEqual([DICTEE]);
   const dictees = await nbDictees();
 
-  // tout de suite après (le presse-papiers n'est pas encore rendu), la personne copie autre chose,
-  // puis recolle : c'est ce qu'elle vient de copier qui doit revenir, pas le texte dicté ni l'ancien
+  // la personne copie autre chose, puis recolle : la dernière dictée est collée (pas l'autre copie),
+  // et elle reste dans le presse-papiers (réglage par défaut « Garder la dictée dans le presse-papiers »)
   await essai(e => { e.collages.length = 0; e.touches.length = 0; e.clip.writeText('Ce que tu avais copié'); });
   expect(await appuyer(RECOLLER)).toBe(true);
   await expect.poll(() => essai(e => e.collages)).toEqual([DICTEE]);
   expect(await essai(e => e.touches)).toEqual(['paste']);
-  await expect.poll(() => etatBulle()).toMatchObject({ ile: 'done', sous: 'Collé là où tu écrivais' });
-  await expect.poll(() => essai(e => e.clip.readText()), { timeout: 4000 }).toBe('Ce que tu avais copié');
+  await expect.poll(() => etatBulle()).toMatchObject({ ile: 'done', sous: 'Collé · Ctrl + V pour le recoller ailleurs' });
+  await bulle.waitForTimeout(1500);
+  expect(await essai(e => e.clip.readText())).toBe(DICTEE);
   expect(await nbDictees(), 'recoller n’ajoute rien à l’historique').toBe(dictees);
+});
+
+test('après une dictée, le texte reste dans le presse-papiers et la bulle dit Ctrl + V ; option coupée, la copie d’avant revient', async () => {
+  const dicter = async () => {
+    await appuyer('Control+Shift+L');
+    await attendreEtat('recording');
+    await bulle.waitForTimeout(1300);
+    await appuyer('Control+Shift+L');
+    await attendreEtat('idle');
+  };
+  await regler({ texte: DICTEE });
+  await essai(e => { e.collages.length = 0; e.clip.writeText('Copie d’avant'); });
+  await dicter();
+  await expect.poll(() => essai(e => e.collages)).toEqual([DICTEE]);
+  await expect.poll(() => etatBulle()).toMatchObject({ ile: 'done', sous: 'Collé · Ctrl + V pour le recoller ailleurs' });
+  await bulle.waitForTimeout(1500); // l'ancien rendu arrivait après 1 s
+  expect(await essai(e => e.clip.readText()), 'la dictée reste dans le presse-papiers').toBe(DICTEE);
+
+  // Réglages › Texte : option coupée → une seconde après le collage, la copie d'avant revient
+  await principale.evaluate(() => { location.hash = '#reglages/texte'; });
+  await expect(principale.locator('[data-switch="keepClip"]')).toHaveAttribute('aria-checked', 'true');
+  await principale.click('[data-switch="keepClip"]');
+  await expect.poll(() => bulle.evaluate(() => window.Verbe.Settings.d.keepClip)).toBe(false);
+  await essai(e => { e.collages.length = 0; e.clip.writeText('Copie d’avant'); });
+  await dicter();
+  await expect.poll(() => essai(e => e.collages)).toEqual([DICTEE]);
+  await expect.poll(() => etatBulle()).toMatchObject({ sous: 'Collé · Ctrl + Maj + 9 pour le recoller' });
+  await expect.poll(() => essai(e => e.clip.readText()), { timeout: 4000 }).toBe('Copie d’avant');
+  await principale.click('[data-switch="keepClip"]'); // remis comme par défaut pour la suite
+  await expect.poll(() => bulle.evaluate(() => window.Verbe.Settings.d.keepClip)).toBe(true);
 });
 
 test('réécrire : sélection copiée, consigne écoutée, version réécrite collée par-dessus, copie d’avant rendue', async () => {
