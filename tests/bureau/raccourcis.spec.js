@@ -288,3 +288,22 @@ test('copie d’avant (fausse) : rendue après un collage, avec sa mise en forme
   await bulle.waitForTimeout(1500); // le rendu se fait une seconde après le collage
   expect((await lire()).texte).toBe('Nouvelle copie');
 });
+
+test('pendant la dictée, la fenêtre principale montre la même pastille que la bulle, avec la voix, sous le micro', async () => {
+  await regler({ texte: DICTEE });
+  await principale.evaluate(() => { location.hash = '#dicter'; });
+  await appuyer('Control+Shift+L');
+  await attendreEtat('recording');
+  const fenetre = () => principale.evaluate(() => ({
+    ile: window.Verbe.Island.state,
+    forme: window.Verbe.Settings.d.islandStyle,
+    sousLeMicro: document.querySelector('#island').classList.contains('under-mic'),
+    voix: (window.Verbe.App.remoteLevels?.bands || []).length,
+  }));
+  await expect.poll(fenetre).toMatchObject({ ile: 'recording', sousLeMicro: true });
+  await expect.poll(async () => (await fenetre()).voix, { message: 'la voix arrive de la bulle' }).toBeGreaterThan(0);
+  expect((await fenetre()).forme).toBe(await bulle.evaluate(() => window.Verbe.Settings.d.islandStyle));
+  await appuyer('Control+Shift+L');
+  await attendreEtat('idle');
+  await expect.poll(async () => (await fenetre()).ile).not.toBe('recording');
+});

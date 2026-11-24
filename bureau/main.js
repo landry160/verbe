@@ -3,7 +3,7 @@
 // - une bulle ronde, sans cadre, toujours au-dessus, qui ne prend jamais le focus ;
 // - le texte est copié puis collé tout seul là où on écrivait ;
 // - la fenêtre principale (Dicter, Historique, Réglages) se range près de l'horloge.
-const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, Tray, Menu, nativeImage, session, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, Tray, Menu, nativeImage, session, shell, Notification } = require('electron');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
@@ -303,6 +303,7 @@ function createTray() {
 const others = sender => [main, bubble].filter(w => w && !w.isDestroyed() && w.webContents !== sender);
 ipcMain.on('verbe:toggle', toggleDictation);
 ipcMain.on('verbe:cancel', () => bubble?.webContents.send('verbe:cancel'));
+ipcMain.on('verbe:levels', (e, d) => { if (main && !main.isDestroyed() && main.isVisible()) main.webContents.send('verbe:levels', d); });
 ipcMain.on('verbe:state', (e, s) => { bubbleState = s; syncEscape(); main?.webContents.send('verbe:state', s); });
 ipcMain.on('verbe:notify', (e, kind) => { if (kind === 'history' || kind === 'settings') for (const w of others(e.sender)) w.webContents.send('verbe:' + kind); });
 let placedPos = null;
@@ -417,7 +418,21 @@ function installUpdate() {
   if (maj.etat !== 'ready') return;
   if (MAJ_TEST) { majTest.installations++; return; }
   quitting = true;
+  annoncerInstallation(true);
   updater.quitAndInstall(true, true); /* installation silencieuse, puis Verbe se relance */
+}
+/* L'installation ne montre rien pendant 10 à 20 s : sans ce message, on relance Verbe, l'installateur le
+   referme pour remplacer ses fichiers, et il faut s'y reprendre à plusieurs fois (vu le 24 nov.). */
+let annonce = false;
+function annoncerInstallation(relance) {
+  if (annonce || MAJ_TEST || !Notification.isSupported()) return;
+  annonce = true;
+  new Notification({
+    title: `Mise à jour de Verbe ${maj.version}`,
+    body: relance ? 'Installation en cours : Verbe se rouvre tout seul dans quelques secondes. Pas besoin de le relancer.'
+      : 'Installation en cours (environ 15 s). Attends un peu avant de rouvrir Verbe.',
+    icon: ICON, silent: true,
+  }).show();
 }
 function updateMenu() {
   return maj.etat === 'ready' ? [{ type: 'separator' }, { label: `Redémarrer maintenant (version ${maj.version})`, click: installUpdate }] : [];
@@ -467,5 +482,5 @@ app.whenReady().then(() => {
   setTimeout(() => { if (!accel) setShortcut('Control+Shift+L'); }, 4000);
 });
 app.on('window-all-closed', e => e.preventDefault());
-app.on('before-quit', () => { quitting = true; });
+app.on('before-quit', () => { quitting = true; if (maj.etat === 'ready' && updater && !MAJ_TEST) annoncerInstallation(false); });
 app.on('will-quit', () => { hotkeys.unregisterAll(); });

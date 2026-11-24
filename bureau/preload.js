@@ -1,12 +1,14 @@
 // Pont entre la page Verbe et l'app bureau : la page ne voit que ces fonctions.
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CHANNELS = ['toggle', 'cancel', 'state', 'history', 'settings', 'route', 'preview', 'repaste', 'rewrite'];
+const CHANNELS = ['toggle', 'cancel', 'state', 'history', 'settings', 'route', 'preview', 'repaste', 'rewrite', 'levels'];
 
 contextBridge.exposeInMainWorld('verbeDesktop', {
   toggle: () => ipcRenderer.send('verbe:toggle'),
   cancel: () => ipcRenderer.send('verbe:cancel'),
   state: s => ipcRenderer.send('verbe:state', String(s)),
+  /* la voix de la bulle, pour la pastille de la fenêtre principale : { bands, level } */
+  levels: d => ipcRenderer.send('verbe:levels', d),
   notify: kind => ipcRenderer.send('verbe:notify', String(kind)),
   /* la position voyage avec la demande (« center », « top », « bottom ») ; false cache la bulle */
   bubble: pos => ipcRenderer.send('verbe:bubble', pos ? String(pos) : false),

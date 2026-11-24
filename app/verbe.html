@@ -1103,7 +1103,7 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v0.5.1</p>
+          <p class="foot">Verbe v0.5.2</p>
         </section>
 
       </div>
@@ -2708,7 +2708,8 @@ const Island = {
      micro : elle ne cache plus le micro. Ailleurs, le CSS la pose en bas. */
   place() {
     const R = this.root;
-    const under = !this.inPip && !IS_BUBBLE && this.state !== 'hidden' && document.body.dataset.view === 'dicter' && R.dataset.pos === 'center';
+    /* fenêtre principale du bureau : toujours sous le micro sur Dicter (la bulle, elle, suit la position choisie) */
+    const under = !this.inPip && !IS_BUBBLE && this.state !== 'hidden' && document.body.dataset.view === 'dicter' && (R.dataset.pos === 'center' || REMOTE);
     R.classList.toggle('under-mic', under);
     document.body.classList.toggle('isl-under-mic', under);
     if (under) R.style.setProperty('--isl-top', `${Math.round($('#mic-cap').getBoundingClientRect().top - 6)}px`);
@@ -2769,6 +2770,11 @@ const Island = {
     this.shell.style.setProperty('--glow', glow);
     /* l'anneau du gros micro et du micro flottant bat au rythme de la voix */
     if (!this.data.preview) for (const el of this.halos || (this.halos = [$('#mic'), $('#dock')])) el.style.setProperty('--lvl', glow);
+    /* bureau : la bulle envoie la voix à la fenêtre principale, qui montre la même pastille (v0.5.2) */
+    if (IS_BUBBLE && Desktop?.levels && src && !this.data.preview) {
+      const t = now();
+      if (t - (this.sentT || 0) > 33) { this.sentT = t; Desktop.levels({ bands: bands ? Array.from(bands) : [], level }); }
+    }
     const N = this.levels.length, half = N / 2;
     for (let i = 0; i < N; i++) {
       const k = i < half ? half - 1 - i : i - half; /* basses au centre, aigus aux bords */
@@ -4150,7 +4156,15 @@ function wireDesktop() {
   });
   Desktop.on('cancel', () => { if (IS_BUBBLE) App.cancel(); });
   /* la fenêtre principale montre l'état de la bulle sur ses micros */
-  Desktop.on('state', s => { if (REMOTE && App.state !== s) App.setState(s); });
+  Desktop.on('state', s => {
+    if (REMOTE && App.state !== s) App.setState(s);
+    /* la fenêtre principale montre la même pastille que la bulle, avec la voix qu'elle lui envoie */
+    if (!REMOTE) return;
+    if (s === 'recording') { Island.source = () => App.remoteLevels; Island.show('recording', { clock0: now() }); }
+    else if (s === 'transcribing') Island.show('transcribing');
+    else if (s === 'idle' && ['recording', 'transcribing', 'starting'].includes(Island.state)) { Island.source = null; App.remoteLevels = null; Island.hide(); }
+  });
+  Desktop.on('levels', d => { App.remoteLevels = d; });
   Desktop.on('history', () => loadHistory({ quiet: true }));
   Desktop.on('settings', () => {
     Settings.load();
@@ -4199,7 +4213,15 @@ function wireUpdates() {
     $('#maj-verifier').disabled = s.etat === 'checking' || s.etat === 'downloading';
   };
   Desktop.onUpdate(render);
-  Desktop.setAutoUpdate(Settings.d.autoUpdate !== false).then(render);
+  Desktop.setAutoUpdate(Settings.d.autoUpdate !== false).then(s => {
+    render(s);
+    /* premier lancement après une mise à jour : on le dit, une fois */
+    try {
+      const avant = localStorage.getItem('verbe.version');
+      if (s && s.courante && avant && avant !== s.courante) Toast.show({ type: 'ok', text: `Verbe ${s.courante} est installé.`, sub: 'La mise à jour s’est faite toute seule.', duration: 6000 });
+      if (s && s.courante) localStorage.setItem('verbe.version', s.courante);
+    } catch (e) { /* stockage indisponible : rien à dire */ }
+  });
   $('#maj-switch').addEventListener('click', () => Desktop.setAutoUpdate(Settings.d.autoUpdate).then(render));
   $('#maj-verifier').addEventListener('click', () => Desktop.checkUpdate().then(render));
   $('#maj-redemarrer').addEventListener('click', () => Desktop.installUpdate());
