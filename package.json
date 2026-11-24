@@ -14,9 +14,11 @@
     "raccourci": "node bureau/installer-raccourci.js",
     "installateur": "vite build && electron-builder --win nsis --x64 --publish never",
     "pretest": "vite build",
-    "test": "playwright test",
+    "test": "tsc -p tsconfig.json && vitest run && playwright test",
     "test:web": "vite build && playwright test --project=web",
-    "test:bureau": "vite build && playwright test --project=bureau"
+    "test:bureau": "vite build && playwright test --project=bureau",
+    "typecheck": "tsc -p tsconfig.json",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

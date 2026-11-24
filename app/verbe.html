@@ -220,7 +220,7 @@ function trimSilences(x, sr) {
 function cleanTranscript(t) {
 	let s = String(t || "").replace(/\r/g, "").trim();
 	s = s.replace(/^["“«`]+\s*|\s*["”»`]+$/g, "");
-	s = s.replace(/(^|[.!?…]\s+)[^.!?…]*sous-titr[^.!?…]*(amara|radio-canada|st'?\s?501)[^.!?…]*[.!?…]?/gi, "$1");
+	s = s.replace(/(^|[.!?…]\s+)[^.!?…]*sous-titr[^.!?…]*(amara(?:\.org)?|radio-canada|st'?\s?501)[^.!?…]*[.!?…]?/gi, "$1");
 	return s.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 var VOICE_CMDS = [

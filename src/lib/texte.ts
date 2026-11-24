@@ -4,7 +4,7 @@
 export function cleanTranscript(t: unknown): string {
   let s = String(t || '').replace(/\r/g, '').trim();
   s = s.replace(/^["“«`]+\s*|\s*["”»`]+$/g, '');
-  s = s.replace(/(^|[.!?…]\s+)[^.!?…]*sous-titr[^.!?…]*(amara|radio-canada|st'?\s?501)[^.!?…]*[.!?…]?/gi, '$1');
+  s = s.replace(/(^|[.!?…]\s+)[^.!?…]*sous-titr[^.!?…]*(amara(?:\.org)?|radio-canada|st'?\s?501)[^.!?…]*[.!?…]?/gi, '$1'); /* « …Amara.org » : le point du nom de domaine ne coupe pas la phrase */
   return s.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
