@@ -18,11 +18,12 @@ concurrency:
 jobs:
   web:
     name: Version web (Chromium, Linux)
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04 et non « latest » : ubuntu-latest est passé à 26.04, que Playwright 1.56 ne prend pas encore en charge
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -36,7 +37,7 @@ jobs:
         run: npx playwright test --project=web
       - name: Garder les traces en cas d'échec
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: traces-web
           path: test-results/
@@ -47,8 +48,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -58,7 +59,7 @@ jobs:
         run: npx playwright test --project=bureau
       - name: Garder les traces en cas d'échec
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: traces-bureau
           path: test-results/
