@@ -1175,7 +1175,7 @@ const IS_BUBBLE = !!Desktop && new URLSearchParams(location.search).get('bulle')
 const REMOTE = !!Desktop && !IS_BUBBLE; /* fenêtre principale : le micro vit dans la bulle */
 if (Desktop) document.documentElement.classList.add('bureau');
 /* Lien de l'installateur Windows, une fois publié en ligne. Vide = bouton caché. */
-const DOWNLOAD_URL = '';
+const DOWNLOAD_URL = 'https://github.com/landry160/verbe/releases/latest/download/Verbe-Setup.exe';
 if (IS_BUBBLE) document.documentElement.classList.add('bulle');
 /* Ctrl + une lettre seule, ou une lettre sans Ctrl/Alt/⌘, se bat avec
    Windows et le navigateur (Ctrl+V colle, Ctrl+C copie…). */
