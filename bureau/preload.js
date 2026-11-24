@@ -1,7 +1,7 @@
 // Pont entre la page Verbe et l'app bureau : la page ne voit que ces fonctions.
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CHANNELS = ['toggle', 'cancel', 'state', 'history', 'settings', 'route', 'preview'];
+const CHANNELS = ['toggle', 'cancel', 'state', 'history', 'settings', 'route', 'preview', 'repaste', 'rewrite'];
 
 contextBridge.exposeInMainWorld('verbeDesktop', {
   toggle: () => ipcRenderer.send('verbe:toggle'),
@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('verbeDesktop', {
   copy: text => ipcRenderer.invoke('verbe:copy', String(text)),
   paste: () => ipcRenderer.invoke('verbe:paste'),
   setShortcut: accel => ipcRenderer.invoke('verbe:shortcut', String(accel)),
+  /* Recoller et Réécrire : name = « repaste » ou « rewrite » ; accel vide = éteint */
+  setAction: (name, accel) => ipcRenderer.invoke('verbe:action-shortcut', String(name), String(accel || '')),
+  grab: () => ipcRenderer.invoke('verbe:grab'),
+  giveBack: ours => ipcRenderer.invoke('verbe:give-back', String(ours || '')),
+  pasteText: text => ipcRenderer.invoke('verbe:paste-text', String(text)),
   getLogin: () => ipcRenderer.invoke('verbe:login-get'),
   setLogin: on => ipcRenderer.invoke('verbe:login-set', !!on),
   on: (channel, fn) => {
