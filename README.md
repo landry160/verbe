@@ -39,9 +39,26 @@ des compteurs de limite.
    de l'icône près de l'horloge) l'installe tout de suite. L'interrupteur « Mises à jour automatiques » (actif par défaut) et
    le bouton « Vérifier maintenant » sont dans Réglages › Général. La version web, elle, est toujours à jour.
 
+### Deux raccourcis de plus (à allumer dans Réglages › Raccourci)
+
+- **Recoller la dernière dictée** (proposé : **Ctrl + Maj + 9**) : le texte est parti dans la mauvaise
+  fenêtre ? Clique au bon endroit et fais le raccourci : la dernière dictée y est collée.
+- **Réécrire la sélection** (proposé : **Ctrl + Maj + 7**) : sélectionne un texte dans n'importe quelle app,
+  fais le raccourci, dis la consigne (« plus poli », « plus court », « en anglais », « corrige les fautes »),
+  puis refais le raccourci (ou Ctrl + Maj + L, ou tais-toi : l'arrêt automatique). Verbe remplace la
+  sélection par la version réécrite. Il utilise la clé déjà donnée (même modèle que le texte propre) ;
+  le texte sélectionné n'est jamais pris pour une consigne.
+- Les deux sont **éteints par défaut** : un raccourci global vole sa combinaison dans toutes les apps, et
+  aucune lettre n'est libre avec Ctrl + Maj (Word, Teams, VS Code ou Edge en prennent chacune). Les chiffres
+  7 et 9 ne sont pris que par Excel ; 8 affiche les ¶ dans Word. Pas de Ctrl + Alt : c'est AltGr sur un clavier canadien.
+- « Modifier » les change comme le raccourci principal. Une combinaison déjà prise par un autre raccourci
+  de Verbe est refusée ; une combinaison déjà prise par une autre app est signalée.
+- Ce que tu avais copié revient dans le presse-papiers après le collage, ou tout de suite si tu annules.
+  Ces raccourcis n'existent pas dans la version web (le bouton Copier suffit).
+
 ## Réglages
 
-Une section à la fois : Transcription (service, clé, langue, **ce qu'il te reste**), Micro, Raccourci,
+Une section à la fois : Transcription (service, clé, langue, **ce qu'il te reste**), Micro, Raccourci (dictée ; dans le bureau, Recoller et Réécrire),
 Texte (commandes à la voix, texte propre, « Coller en » une autre langue, ton selon l'app, collage, mes mots, textes tout prêts), Bulle (forme Barres / Onde / Points dessinée
 en ligne de part et d’autre du micro, position en bas par défaut, sons, aperçu) et Général (apparence, lancement avec Windows, mises à jour automatiques, audio gardé, historique).
 
@@ -138,8 +155,12 @@ npm run test:bureau               # l'app Electron (Windows)
   presse-papiers rendu après le collage, progrès à jour dans la fenêtre principale après une dictée de la bulle,
   ton selon l'app (catégorie des programmes, consigne envoyée au modèle simulé), mises à jour (nouvelle version,
   à jour, interrupteur coupé, version de développement) avec un serveur local et un faux installateur, jamais lancé.
+  `raccourcis.spec.js` : Recoller, Réécrire (sélection, consigne,
+  collage, presse-papiers rendu, rien de sélectionné, Échap, sans clé), doublons refusés, raccourci pris par une autre app.
+  Il lance l'app avec `--essai-clavier` : touches, presse-papiers et raccourcis globaux sont des faux en mémoire,
+  le micro est le faux micro de Chromium et Groq est simulé dans l'app (`protocol.handle`).
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
-  Le micro est un faux micro de Chromium qui joue un son continu.
+  Le micro est un faux micro de Chromium qui joue des « syllabes » (un son continu serait effacé par l’anti-bruit).
 - Rien de personnel n'est touché : la version bureau tourne dans un profil à part (`--profil=`),
   aucune dictée ni aucun collage réel n'a lieu, et le presse-papiers est remis tel quel à la fin.
 - Sur GitHub, chaque envoi sur `main` lance les deux séries (`.github/workflows/tests.yml`) :
