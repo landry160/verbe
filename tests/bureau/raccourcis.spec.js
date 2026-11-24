@@ -289,7 +289,7 @@ test('copie d’avant (fausse) : rendue après un collage, avec sa mise en forme
   expect((await lire()).texte).toBe('Nouvelle copie');
 });
 
-test('pendant la dictée, la fenêtre principale montre la même pastille que la bulle, avec la voix, sous le micro', async () => {
+test('pendant la dictée, la fenêtre principale montre la même pastille que la bulle à la place du micro, avec la voix', async () => {
   await regler({ texte: DICTEE });
   await principale.evaluate(() => { location.hash = '#dicter'; });
   await appuyer('Control+Shift+L');
@@ -297,13 +297,18 @@ test('pendant la dictée, la fenêtre principale montre la même pastille que la
   const fenetre = () => principale.evaluate(() => ({
     ile: window.Verbe.Island.state,
     forme: window.Verbe.Settings.d.islandStyle,
-    sousLeMicro: document.querySelector('#island').classList.contains('under-mic'),
+    miroir: document.querySelector('#island').classList.contains('miroir'),
+    microCache: getComputedStyle(document.querySelector('#mic')).visibility === 'hidden',
+    boutonRond: getComputedStyle(document.querySelector('#isl-act')).display !== 'none',
+    ecart: (() => { const m = document.querySelector('#mic').getBoundingClientRect(), p = document.querySelector('#island .isl').getBoundingClientRect(); return Math.round(Math.abs((m.top + m.height / 2) - (p.top + p.height / 2))); })(),
     voix: (window.Verbe.App.remoteLevels?.bands || []).length,
   }));
-  await expect.poll(fenetre).toMatchObject({ ile: 'recording', sousLeMicro: true });
+  await expect.poll(fenetre).toMatchObject({ ile: 'recording', miroir: true, microCache: true, boutonRond: true });
+  expect((await fenetre()).ecart, 'la pastille est à la place du micro').toBeLessThanOrEqual(4);
   await expect.poll(async () => (await fenetre()).voix, { message: 'la voix arrive de la bulle' }).toBeGreaterThan(0);
   expect((await fenetre()).forme).toBe(await bulle.evaluate(() => window.Verbe.Settings.d.islandStyle));
   await appuyer('Control+Shift+L');
   await attendreEtat('idle');
   await expect.poll(async () => (await fenetre()).ile).not.toBe('recording');
+  await expect.poll(fenetre, { message: 'le micro revient' }).toMatchObject({ miroir: false, microCache: false });
 });

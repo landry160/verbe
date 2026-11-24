@@ -752,6 +752,26 @@ html.bulle body > :not(#island) { display: none !important; }
 .island.bulle:not([data-state="recording"]):not([data-state="ready"]):not([data-state="starting"]):not([data-state="transcribing"]) .isl { padding: 0 16px 0 12px; }
 @media (prefers-reduced-motion: no-preference) { .island.bulle[data-state="ready"] .isl-act { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .island.bulle .isl { transition: opacity .15s linear; transform: none; } }
+/* ============================================================
+   FENÊTRE PRINCIPALE DU BUREAU, PENDANT LA DICTÉE (v0.5.2) : la même
+   pastille que la bulle prend la place du micro (gros micro sur Dicter,
+   micro flottant ailleurs) ; le micro revient quand la dictée finit.
+   ============================================================ */
+.island.miroir .isl { --w: 340px; --h: 52px; padding: 0 14px; gap: 8px; cursor: pointer; }
+.island.miroir .isl-act {
+  display: grid; place-items: center; padding: 0; position: absolute; z-index: 2; left: 50%; top: 50%;
+  width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 0; border-radius: 50%; cursor: pointer;
+  background: #fff; color: #8A4418;
+  box-shadow: 0 0 0 calc(3px + var(--glow, 0) * 9px) rgba(233,163,95,.22), 0 4px 12px rgba(0,0,0,.35);
+}
+.island.miroir .isl-act svg { width: 16px; height: 16px; }
+.island.miroir .isl-act .spin { width: 20px; height: 20px; }
+.island.miroir:is([data-state="starting"], [data-state="transcribing"]) .isl-act { background: rgba(255,255,255,.08); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); pointer-events: none; }
+.island.miroir:is([data-state="starting"], [data-state="recording"], [data-state="transcribing"]) .isl-txt { display: none; }
+.island.miroir:is([data-state="starting"], [data-state="recording"], [data-state="transcribing"]) :is(.isl-l, .isl-r) { width: 44px; min-width: 0; }
+.island.miroir .isl-l { place-items: center start; }
+.island.miroir .isl-r { font-size: 12.5px; }
+body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -2708,6 +2728,12 @@ const Island = {
      micro : elle ne cache plus le micro. Ailleurs, le CSS la pose en bas. */
   place() {
     const R = this.root;
+    if (this.miroir && this.state !== 'hidden') {
+      const a = document.body.dataset.view === 'dicter' ? $('#mic') : $('#dock'), r = a.getBoundingClientRect();
+      R.classList.add('under-mic');
+      R.style.setProperty('--isl-top', `${Math.round(r.top + r.height / 2 - 26)}px`);
+      return;
+    }
     /* fenêtre principale du bureau : toujours sous le micro sur Dicter (la bulle, elle, suit la position choisie) */
     const under = !this.inPip && !IS_BUBBLE && this.state !== 'hidden' && document.body.dataset.view === 'dicter' && (R.dataset.pos === 'center' || REMOTE);
     R.classList.toggle('under-mic', under);
@@ -2798,7 +2824,7 @@ const Island = {
     return this.drawBars(time);
   },
   /* largeur laissée libre au milieu pour le micro rond (mini-fenêtre, bulle) */
-  get hole() { return IS_BUBBLE ? 58 : this.inPip ? 86 : 0; }, /* la bulle fine : un trou plus petit autour du micro */
+  get hole() { return IS_BUBBLE || this.miroir ? 58 : this.inPip ? 86 : 0; }, /* la bulle fine : un trou plus petit autour du micro */
   drawBars(time) {
     const g = this.g, W = this.W, H = this.H, N = this.levels.length, gap = 3, half = N / 2;
     const mid = Math.max(gap, this.hole), side = (W - mid) / 2;
@@ -4160,9 +4186,10 @@ function wireDesktop() {
     if (REMOTE && App.state !== s) App.setState(s);
     /* la fenêtre principale montre la même pastille que la bulle, avec la voix qu'elle lui envoie */
     if (!REMOTE) return;
-    if (s === 'recording') { Island.source = () => App.remoteLevels; Island.show('recording', { clock0: now() }); }
-    else if (s === 'transcribing') Island.show('transcribing');
-    else if (s === 'idle' && ['recording', 'transcribing', 'starting'].includes(Island.state)) { Island.source = null; App.remoteLevels = null; Island.hide(); }
+    const miroir = on => { Island.miroir = on; Island.root.classList.toggle('miroir', on); document.body.classList.toggle('dictee-miroir', on); };
+    if (s === 'recording') { miroir(true); Island.source = () => App.remoteLevels; Island.show('recording', { clock0: now() }); }
+    else if (s === 'transcribing') { miroir(true); Island.show('transcribing'); }
+    else if (s === 'idle' && Island.miroir) { Island.source = null; App.remoteLevels = null; Island.hide(); miroir(false); Island.place(); }
   });
   Desktop.on('levels', d => { App.remoteLevels = d; });
   Desktop.on('history', () => loadHistory({ quiet: true }));
