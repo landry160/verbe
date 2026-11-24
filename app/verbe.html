@@ -1002,6 +1002,18 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-t"><span class="flabel" id="login-label">Lancer Verbe avec Windows</span><p class="help">Le raccourci est prêt dès que tu allumes l’ordi.</p></div>
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="login-label" id="login-switch"></button></div>
             </div>
+            <!-- Mises à jour automatiques (bureau seulement : la version web est toujours à jour) -->
+            <div class="srow desk-only">
+              <div class="srow-t"><span class="flabel" id="maj-label">Mises à jour automatiques</span><p class="help">Verbe se met à jour tout seul, quand tu le quittes.</p></div>
+              <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="maj-label" data-switch="autoUpdate" id="maj-switch"></button></div>
+            </div>
+            <div class="srow desk-only" id="maj-row">
+              <div class="srow-t" role="status" aria-live="polite"><span class="flabel" id="maj-titre">Mises à jour</span><p class="help" id="maj-aide"></p></div>
+              <div class="srow-c">
+                <button class="btn btn-2 btn-sm" type="button" id="maj-verifier">Vérifier maintenant</button>
+                <button class="btn btn-2 btn-sm" type="button" id="maj-redemarrer" hidden>Redémarrer maintenant</button>
+              </div>
+            </div>
             <div class="srow">
               <div class="srow-t"><span class="flabel" id="audio-label">Garder l’audio</span><p class="help">Pour réessayer une transcription ratée (30 dernières).</p></div>
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="audio-label" data-switch="keepAudio"></button></div>
@@ -1164,6 +1176,7 @@ const DEFAULTS = {
   floating: true,
   floatTip: false,
   keepAudio: true,
+  autoUpdate: true, /* bureau : vérifier les mises à jour au démarrage puis toutes les 6 h */
   freeLocal: true,
   hideTip: false,
   conflictTip: false,
@@ -3509,7 +3522,38 @@ function wireDesktop() {
       const v = await Desktop.setLogin(sw.getAttribute('aria-checked') !== 'true');
       sw.setAttribute('aria-checked', String(!!v));
     });
+    wireUpdates();
   }
+}
+
+/* Mises à jour automatiques (bureau) : l'app vérifie, télécharge et installe ; la page montre
+   l'état dans Réglages › Général et transmet l'interrupteur. Rien de tout ça dans la version web. */
+function wireUpdates() {
+  const render = s => {
+    if (!s) return;
+    const cur = `Version ${s.courante}.`;
+    const [titre, aide] = {
+      dev: ['Version de développement', 'Les mises à jour automatiques marchent dans la version installée.'],
+      idle: ['Mises à jour', s.auto === false ? `${cur} Vérification automatique coupée.` : `${cur} Vérification dans quelques secondes.`],
+      off: ['Vérification automatique coupée', cur],
+      checking: ['Vérification…', cur],
+      uptodate: ['Verbe est à jour', cur],
+      downloading: [`Nouvelle version ${s.version}`, `Téléchargement… ${s.pourcent || 0} %`],
+      ready: [`Nouvelle version ${s.version} prête`, 'Elle s’installe quand tu quittes Verbe.'],
+      error: ['Vérification impossible', 'Pas de connexion, ou service indisponible. Réessaie plus tard.'],
+    }[s.etat] || ['Mises à jour', cur];
+    $('#maj-titre').textContent = titre;
+    $('#maj-aide').textContent = aide;
+    const ready = s.etat === 'ready';
+    $('#maj-redemarrer').hidden = !ready;
+    $('#maj-verifier').hidden = ready || s.etat === 'dev';
+    $('#maj-verifier').disabled = s.etat === 'checking' || s.etat === 'downloading';
+  };
+  Desktop.onUpdate(render);
+  Desktop.setAutoUpdate(Settings.d.autoUpdate !== false).then(render);
+  $('#maj-switch').addEventListener('click', () => Desktop.setAutoUpdate(Settings.d.autoUpdate).then(render));
+  $('#maj-verifier').addEventListener('click', () => Desktop.checkUpdate().then(render));
+  $('#maj-redemarrer').addEventListener('click', () => Desktop.installUpdate());
 }
 
 /* ============================================================

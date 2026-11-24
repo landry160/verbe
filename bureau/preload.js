@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld('verbeDesktop', {
   setShortcut: accel => ipcRenderer.invoke('verbe:shortcut', String(accel)),
   getLogin: () => ipcRenderer.invoke('verbe:login-get'),
   setLogin: on => ipcRenderer.invoke('verbe:login-set', !!on),
+  /* mises à jour automatiques : état ({ etat, version, pourcent, courante, auto }), interrupteur, vérifier, redémarrer */
+  getUpdate: () => ipcRenderer.invoke('verbe:update-get'),
+  setAutoUpdate: on => ipcRenderer.invoke('verbe:update-auto', !!on),
+  checkUpdate: () => ipcRenderer.invoke('verbe:update-check'),
+  installUpdate: () => ipcRenderer.send('verbe:update-install'),
+  onUpdate: fn => ipcRenderer.on('verbe:update', (_e, data) => fn(data)),
   on: (channel, fn) => {
     if (!CHANNELS.includes(channel)) return;
     ipcRenderer.on('verbe:' + channel, (_e, data) => fn(data));

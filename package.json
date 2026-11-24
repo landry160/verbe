@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "raccourci": "node bureau/installer-raccourci.js",
-    "installateur": "electron-builder --win nsis --x64",
+    "installateur": "electron-builder --win nsis --x64 --publish never",
     "test": "playwright test",
     "test:web": "playwright test --project=web",
     "test:bureau": "playwright test --project=bureau"
@@ -37,6 +37,13 @@
       "!node_modules/koffi/doc/**"
     ],
     "asar": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "landry160",
+        "repo": "verbe"
+      }
+    ],
     "win": {
       "target": [
         {
@@ -51,7 +58,7 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "artifactName": "Verbe-Setup-${version}.exe",
+      "artifactName": "Verbe-Setup.exe",
       "shortcutName": "Verbe",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
@@ -62,6 +69,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "6.3.9",
     "koffi": "2.9.1"
   }
 }

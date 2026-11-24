@@ -142,11 +142,12 @@ function prettyAccel() { return (accel || '').replace('Control', 'Ctrl').replace
 function updateTray() {
   if (!tray) return;
   tray.setToolTip(accel ? `Verbe — ${prettyAccel()} pour dicter` : 'Verbe');
-  tray.setContextMenu(Menu.buildFromTemplate([
+  tray.setContextMenu(trayMenu = Menu.buildFromTemplate([
     { label: accel ? `Dicter    ${prettyAccel()}` : 'Dicter', click: toggleDictation },
     { label: 'Ouvrir Verbe', click: () => showMain() },
     { label: 'Historique', click: () => showMain('#historique') },
     { label: 'Réglages', click: () => showMain('#reglages') },
+    ...updateMenu(),
     { type: 'separator' },
     { label: 'Quitter Verbe', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -190,6 +191,89 @@ const loginOpts = () => ({ path: process.execPath, args: app.isPackaged ? ['--ca
 ipcMain.handle('verbe:login-get', () => app.getLoginItemSettings(loginOpts()).openAtLogin);
 ipcMain.handle('verbe:login-set', (e, on) => { app.setLoginItemSettings(Object.assign({ openAtLogin: on }, loginOpts())); return app.getLoginItemSettings(loginOpts()).openAtLogin; });
 
+/* ---------- Mises à jour automatiques (electron-updater) ----------
+   - source : les versions GitHub de landry160/verbe (latest.yml + Verbe-Setup.exe, voir README) ;
+   - vérification quelques secondes après le démarrage, puis toutes les 6 h, si l'interrupteur
+     de Réglages › Général est actif (la page nous le dit) ; « Vérifier maintenant » marche toujours ;
+   - téléchargement en arrière-plan, installation quand on quitte Verbe, ou tout de suite
+     avec « Redémarrer maintenant » (Réglages › Général et menu de l'icône) ;
+   - jamais dans la version de développement (app.isPackaged faux), sauf en mode test :
+     --maj-test=<url> lit le latest.yml d'un serveur local (fournisseur « generic »). En mode test,
+     rien ne s'installe jamais : ni à la fermeture, ni avec « Redémarrer maintenant » (simple compteur).
+   L'app n'est pas signée : app-update.yml n'a donc pas de « publisherName », et electron-updater
+   saute la vérification de signature du nouvel installateur (il garde celle du sha512 de latest.yml). */
+const MAJ_TEST = (process.argv.find(a => a.startsWith('--maj-test=')) || '').slice('--maj-test='.length);
+const MAJ_DELAI = MAJ_TEST ? 300 : 8000; /* premier coup d'œil après le démarrage */
+const MAJ_PERIODE = 6 * 60 * 60 * 1000;
+let updater = null, trayMenu = null, majAuto = null, majPret = false;
+let maj = { etat: app.isPackaged || MAJ_TEST ? 'idle' : 'dev', version: '', pourcent: 0, courante: app.getVersion() };
+const majTest = { installations: 0, etats: [] }; /* pour les tests */
+function setMaj(next) {
+  maj = Object.assign({}, maj, next);
+  if (MAJ_TEST) majTest.etats.push(maj.etat);
+  if (main && !main.isDestroyed()) main.webContents.send('verbe:update', Object.assign({ auto: majAuto }, maj));
+  if (next.etat) updateTray();
+}
+function getUpdater() {
+  if (updater || maj.etat === 'dev') return updater;
+  const { autoUpdater } = require('electron-updater');
+  updater = autoUpdater;
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = !MAJ_TEST;
+  updater.disableWebInstaller = true; /* un installateur complet, pas d'installateur web */
+  if (MAJ_TEST) {
+    /* le serveur local, et le cache du téléchargement dans le profil de test (jamais dans %LOCALAPPDATA%) */
+    const dossier = app.getPath('userData');
+    const config = path.join(dossier, 'maj-test.yml');
+    require('fs').writeFileSync(config, `provider: generic\nurl: ${JSON.stringify(MAJ_TEST)}\nupdaterCacheDirName: maj-cache\n`);
+    updater.updateConfigPath = config;
+    updater.forceDevUpdateConfig = true;
+    updater.disableDifferentialDownload = true;
+    Object.defineProperty(updater.app, 'baseCachePath', { get: () => dossier });
+  }
+  updater.on('checking-for-update', () => setMaj({ etat: 'checking' }));
+  updater.on('update-not-available', () => setMaj({ etat: 'uptodate', version: '' }));
+  updater.on('update-available', info => setMaj({ etat: 'downloading', version: info.version, pourcent: 0 }));
+  updater.on('download-progress', p => setMaj({ pourcent: Math.round(p.percent || 0) }));
+  updater.on('update-downloaded', info => setMaj({ etat: 'ready', version: info.version }));
+  updater.on('error', () => { if (maj.etat !== 'ready') setMaj({ etat: 'error' }); });
+  return updater;
+}
+function checkUpdates() {
+  const u = getUpdater();
+  if (!u || ['checking', 'downloading', 'ready'].includes(maj.etat)) return;
+  setMaj({ etat: 'checking' });
+  u.checkForUpdates().catch(() => { if (maj.etat !== 'ready') setMaj({ etat: 'error' }); });
+}
+function installUpdate() {
+  if (maj.etat !== 'ready') return;
+  if (MAJ_TEST) { majTest.installations++; return; }
+  quitting = true;
+  updater.quitAndInstall(true, true); /* installation silencieuse, puis Verbe se relance */
+}
+function updateMenu() {
+  return maj.etat === 'ready' ? [{ type: 'separator' }, { label: `Redémarrer maintenant (version ${maj.version})`, click: installUpdate }] : [];
+}
+function startUpdates() {
+  if (maj.etat === 'dev') return;
+  setTimeout(() => { majPret = true; if (majAuto) checkUpdates(); }, MAJ_DELAI);
+  setInterval(() => { if (majAuto) checkUpdates(); }, MAJ_PERIODE);
+}
+ipcMain.handle('verbe:update-get', () => Object.assign({ auto: majAuto }, maj));
+ipcMain.handle('verbe:update-auto', (e, on) => {
+  majAuto = !!on;
+  if (maj.etat === 'idle' || maj.etat === 'off') setMaj({ etat: majAuto ? 'idle' : 'off' });
+  if (majAuto && majPret && maj.etat === 'idle') checkUpdates();
+  return Object.assign({ auto: majAuto }, maj);
+});
+ipcMain.handle('verbe:update-check', () => { checkUpdates(); return Object.assign({ auto: majAuto }, maj); });
+ipcMain.on('verbe:update-install', installUpdate);
+global.verbeMaj = { /* pour les tests */
+  etat: () => Object.assign({ auto: majAuto, charge: !!updater }, maj, majTest),
+  menu: () => (trayMenu ? trayMenu.items.map(i => i.label).filter(Boolean) : []),
+  cliquer: label => trayMenu?.items.find(i => i.label.startsWith(label))?.click(),
+};
+
 /* ---------- Démarrage ---------- */
 app.on('second-instance', () => showMain());
 app.whenReady().then(() => {
@@ -209,6 +293,7 @@ app.whenReady().then(() => {
   createBubble();
   createMain();
   createTray();
+  startUpdates();
   /* si la page n'a pas encore donné son raccourci, on prend celui par défaut */
   setTimeout(() => { if (!accel) setShortcut('Control+Shift+L'); }, 4000);
 });

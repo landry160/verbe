@@ -1,0 +1,52 @@
+# Publier une version de Verbe : sur une étiquette « v* » (par exemple v0.4.7), construire l'installateur
+# sous Windows et créer la version GitHub avec les trois fichiers des mises à jour automatiques :
+# Verbe-Setup.exe, latest.yml et Verbe-Setup.exe.blockmap.
+# L'étiquette doit correspondre à la version de package.json (v + version), sinon rien n'est publié.
+name: Publier une version
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Installateur Windows et version GitHub
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Vérifier que l'étiquette correspond à package.json
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::L'étiquette $GITHUB_REF_NAME ne correspond pas à la version v$version de package.json"
+            exit 1
+          fi
+      - name: Installer les dépendances
+        run: npm ci
+      - name: Construire l'installateur (non signé)
+        run: npx electron-builder --win nsis --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Publier la version GitHub
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -l dist/Verbe-Setup.exe dist/latest.yml dist/Verbe-Setup.exe.blockmap
+          grep -q "path: Verbe-Setup.exe" dist/latest.yml
+          gh release create "$GITHUB_REF_NAME" \
+            dist/Verbe-Setup.exe dist/latest.yml dist/Verbe-Setup.exe.blockmap \
+            --title "Verbe ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
