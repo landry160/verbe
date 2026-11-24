@@ -54,6 +54,45 @@ function pingKeyboard() { loadKeyboard(); return SendInput && key(0x10, true) ? 
 global.verbePingKeyer = async () => pingKeyboard(); /* pour les tests */
 global.verbeClipboard = { save: () => saveClipboard(), restore: t => restoreClipboard(t) }; /* pour les tests */
 
+/* ---------- L'app au premier plan (ton selon l'app) ----------
+   Au début d'une dictée, on lit le nom du programme où tu écris (« OUTLOOK.EXE », « ms-teams.exe »…)
+   et on le donne à la bulle. Rien d'autre : ni le titre de la fenêtre, ni son contenu. */
+let FG = null;
+function loadForeground() {
+  if (process.platform !== 'win32' || FG !== null) return FG;
+  try {
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll'), kernel32 = koffi.load('kernel32.dll');
+    FG = {
+      GetForegroundWindow: user32.func('void * __stdcall GetForegroundWindow()'),
+      GetWindowThreadProcessId: user32.func('uint32 __stdcall GetWindowThreadProcessId(void *hWnd, _Out_ uint32 *lpdwProcessId)'),
+      OpenProcess: kernel32.func('void * __stdcall OpenProcess(uint32 dwDesiredAccess, int bInheritHandle, uint32 dwProcessId)'),
+      QueryFullProcessImageNameW: kernel32.func('int __stdcall QueryFullProcessImageNameW(void *hProcess, uint32 dwFlags, _Out_ uint16 *lpExeName, _Inout_ uint32 *lpdwSize)'),
+      CloseHandle: kernel32.func('int __stdcall CloseHandle(void *hObject)'),
+    };
+  } catch (e) { console.error('[Verbe] app au premier plan illisible :', e.message); FG = false; }
+  return FG;
+}
+function foregroundApp() {
+  const f = loadForeground();
+  if (!f) return '';
+  try {
+    const hwnd = f.GetForegroundWindow();
+    if (!hwnd) return '';
+    const pid = [0];
+    f.GetWindowThreadProcessId(hwnd, pid);
+    if (!pid[0]) return '';
+    const h = f.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, 0, pid[0]);
+    if (!h) return '';
+    try {
+      const buf = new Uint16Array(1024), size = [buf.length];
+      if (!f.QueryFullProcessImageNameW(h, 0, buf, size)) return '';
+      return path.basename(Buffer.from(buf.buffer, 0, size[0] * 2).toString('utf16le'));
+    } finally { f.CloseHandle(h); }
+  } catch (e) { return ''; }
+}
+global.verbeForegroundApp = () => foregroundApp(); /* remplaçable par un faux dans les tests */
+
 /* ---------- Presse-papiers : rendu après un collage automatique ----------
    Verbe écrit le texte dicté dans le presse-papiers pour le coller ; une seconde après,
    il remet ce qui s'y trouvait avant (texte, mise en forme ou image), sauf si quelqu'un
@@ -122,7 +161,8 @@ function showMain(hash) {
 }
 
 /* ---------- Raccourcis ---------- */
-function toggleDictation() { bubble?.webContents.send('verbe:toggle'); }
+/* au début d'une dictée, la bulle reçoit aussi le nom de l'app où tu écris (ton selon l'app) */
+function toggleDictation() { bubble?.webContents.send('verbe:toggle', { app: bubbleState === 'idle' ? global.verbeForegroundApp() : '' }); }
 function setShortcut(next) {
   if (accel) { try { globalShortcut.unregister(accel); } catch (e) { /* déjà libre */ } }
   accel = null;

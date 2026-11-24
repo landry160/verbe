@@ -38,7 +38,7 @@ des compteurs de limite.
 ## Réglages
 
 Une section à la fois : Transcription (service, clé, langue, **ce qu'il te reste**), Micro, Raccourci,
-Texte (commandes à la voix, texte propre, collage), Bulle (forme Barres / Onde / Points dessinée
+Texte (commandes à la voix, texte propre, « Coller en » une autre langue, ton selon l'app, collage), Bulle (forme Barres / Onde / Points dessinée
 en ligne de part et d’autre du micro, position en bas par défaut, sons, aperçu) et Général (apparence, lancement avec Windows, audio gardé, historique).
 
 ## Commandes à la voix
@@ -46,6 +46,19 @@ en ligne de part et d’autre du micro, position en bas par défaut, sons, aper�
 « virgule », « point final », « point à la ligne », « nouvelle ligne », « nouveau paragraphe »,
 « point d'interrogation », « point d'exclamation », « point-virgule »,
 « ouvrez les guillemets » / « fermez les guillemets », « efface ça » (retire la phrase d'avant).
+
+## Traduire en dictant, ton selon l'app
+
+- **Coller en** (Réglages › Texte) : « Comme je parle » par défaut, ou Français, English, Español.
+  Tu parles dans ta langue, Verbe copie (et colle, dans le bureau) la traduction ; ce que tu as dit
+  reste dans l'historique (au survol de la langue). Avec le texte propre automatique, un seul appel au modèle fait les deux.
+- **Adapter le ton à l'app** (bureau seulement, Réglages › Texte, coupé par défaut) : au début de la dictée,
+  Verbe lit le nom de l'app où tu écris. Courriel et documents (Outlook, nouvel Outlook, Word, Thunderbird…) :
+  ton soigné. Messagerie (Teams, Slack, Discord, WhatsApp…) : ton détendu. Code et terminal (VS Code, Cursor,
+  Visual Studio, JetBrains, Windows Terminal, PowerShell…) : texte tel quel, sans appel au modèle. Ailleurs : rien de spécial.
+  Seul le registre change, jamais ce qui est dit. Coupé par défaut, car chaque dictée passe alors par le modèle (environ 1 s et une requête de plus).
+- Les deux passent par le modèle de langue de « Nettoyer », avec ta clé. Sans clé (ou en mode Navigateur sans clé),
+  le texte d'origine est collé et Verbe prévient une fois.
 
 ## Ce qu'il te reste (limites du service)
 
@@ -80,9 +93,9 @@ npm run test:bureau               # l'app Electron (Windows)
 ```
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
-  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
+  « Nettoyer », « Coller en » (traduction), Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
-  presse-papiers rendu après le collage.
+  presse-papiers rendu après le collage, ton selon l'app (catégorie des programmes, consigne envoyée au modèle simulé).
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
   Le micro est un faux micro de Chromium qui joue un son continu.
 - Rien de personnel n'est touché : la version bureau tourne dans un profil à part (`--profil=`),
