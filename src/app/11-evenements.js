@@ -364,7 +364,6 @@ const NOUVEAUTES = [
 ];
 /* une nouvelle installation n'a rien à découvrir : on le sait avant que les réglages s'enregistrent */
 const DEJA_LA = (() => { try { return !!localStorage.getItem('verbe.reglages.v1'); } catch (e) { return false; } })();
-const cmpVer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
 const News = {
   key: 'verbe.nouveautes',
   seen() { try { return localStorage.getItem(this.key); } catch (e) { return VERSION; } },

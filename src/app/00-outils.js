@@ -1,6 +1,11 @@
 /* ============================================================
    0. Outils
    ============================================================ */
+/* La logique autonome vit dans de vrais modules TypeScript (src/lib), testés avec Vitest. */
+import { encodeWav, splitAtSilences, VOICE_DB, VOICE_FRAMES, analyzeSpeech, TRIM, silenceSpans, trimSilences } from '@lib/audio';
+import { cleanTranscript, applyVoiceCommands, countWords } from '@lib/texte';
+import { appCategory } from '@lib/apps';
+import { cmpVer } from '@lib/versions';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const now = () => performance.now();
@@ -84,7 +89,6 @@ function relTime(ts) {
   if (dt.toDateString() === yest.toDateString()) return `hier, ${hh}`;
   return dt.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) + `, ${hh}`;
 }
-const countWords = t => (String(t).trim().match(/\S+/g) || []).length;
 const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 

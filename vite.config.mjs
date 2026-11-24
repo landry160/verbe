@@ -44,5 +44,6 @@ export default defineConfig({
     reportCompressedSize: false,
     rollupOptions: { input: ici('./src/verbe.html') },
   },
+  resolve: { alias: { '@lib': ici('./src/lib') } },
   server: { port: 5173, strictPort: true },
 });

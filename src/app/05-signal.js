@@ -2,20 +2,6 @@
    5. Traitement du signal (tout se fait dans le navigateur)
    ============================================================ */
 
-/* WAV PCM 16 bits mono : 16 000 échantillons/s × 2 octets = 32 ko/s ≈ 1,9 Mo/min */
-function encodeWav(samples, sr) {
-  const n = samples.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
-  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-  w(36, 'data'); v.setUint32(40, n * 2, true);
-  for (let i = 0, o = 44; i < n; i++, o += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-  return new Blob([buf], { type: 'audio/wav' });
-}
 
 /* Décodage + rééchantillonnage à 16 kHz mono, sans FFmpeg :
    le navigateur décode (MP3, M4A, OGG, WEBM, WAV, FLAC…) et rééchantillonne
@@ -32,152 +18,9 @@ async function decodeToMono16k(blob) {
   return out;
 }
 
-/* Découpe un long audio en morceaux d'environ 5 min, en coupant dans le passage
-   le plus silencieux (énergie moyenne sur 300 ms) autour de chaque cible. */
-function splitAtSilences(x, sr, targetSec = 300, windowSec = 25) {
-  const total = x.length, target = targetSec * sr;
-  if (total <= target * 1.2) return [x];
-  const F = Math.round(sr * 0.02), nF = Math.floor(total / F), e = new Float32Array(nF);
-  for (let f = 0; f < nF; f++) { let s = 0; const o = f * F; for (let i = 0; i < F; i++) { const v = x[o + i]; s += v * v; } e[f] = s / F; }
-  const W = 15, cuts = [0];
-  let pos = 0;
-  while (total - pos > target * 1.2) {
-    const ideal = (pos + target) / F, span = (windowSec * sr) / F;
-    const lo = Math.max(Math.floor(pos / F) + 1, Math.floor(ideal - span)), hi = Math.min(nF - W, Math.ceil(ideal + span));
-    let best = Math.round(ideal), bestV = Infinity;
-    for (let f = lo; f <= hi; f++) {
-      let s = 0; for (let k = 0; k < W; k++) s += e[f + k];
-      if (s < bestV) { bestV = s; best = f + (W >> 1); }
-    }
-    const cut = best * F;
-    if (cut <= pos || cut >= total) break;
-    cuts.push(cut); pos = cut;
-  }
-  cuts.push(total);
-  const parts = [];
-  for (let i = 0; i < cuts.length - 1; i++) parts.push(x.subarray(cuts[i], cuts[i + 1]));
-  return parts;
-}
 
-/* Y a-t-il de la voix ? Une trame de 20 ms compte si elle dépasse -46 dBFS.
-   Il en faut 8 (160 ms) : ça évite d'envoyer du silence, sur lequel Whisper
-   « hallucine » des phrases comme « Sous-titrage Société Radio-Canada ». */
-/* une trame de 20 ms compte comme de la voix au-dessus de -46 dB ; il en faut 8 (160 ms) */
-const VOICE_DB = -46, VOICE_FRAMES = 8;
-function analyzeSpeech(frames) {
-  if (frames.length < 5) return { ok: true, measured: false };
-  let n = 0, max = -200;
-  for (const d of frames) { if (d > VOICE_DB) n++; if (d > max) max = d; }
-  return { ok: n >= VOICE_FRAMES, measured: true, speechMs: n * 20, maxDb: max };
-}
 
-/* Silences coupés avant l'envoi. Avec l'arrêt automatique, une dictée finit par 10 s à 1 min
-   de silence : on ne l'envoie pas (moins de temps compté chez le service, réponse plus rapide,
-   et Whisper n'invente pas de phrases sur le vide). Voix = trame au-dessus de VOICE_DB, comme
-   pour l'arrêt automatique. On garde 0,4 s avant la première voix et 0,5 s après la dernière ;
-   une pause de plus de 2 s est ramenée à 0,7 s ; entre deux voix plus proches, rien n'est touché.
-   Moins de 2 s à gagner : l'audio part tel quel, sans être ré-encodé. */
-const TRIM = { lead: 0.4, tail: 0.5, maxPause: 2, keepPause: 0.7, minGain: 2 };
-/* frames : niveaux en dB par trame de step secondes → passages à garder, en secondes (null : aucune voix) */
-function silenceSpans(frames, step = 0.02) {
-  const total = frames.length * step, isl = [];
-  let a = -1, b = -1;
-  for (let i = 0; i < frames.length; i++) {
-    if (!(frames[i] > VOICE_DB)) continue;
-    if (a < 0) a = i;
-    else if ((i - b - 1) * step > TRIM.maxPause) { isl.push([a, b]); a = i; }
-    b = i;
-  }
-  if (a < 0) return null;
-  isl.push([a, b]);
-  const half = TRIM.keepPause / 2;
-  const spans = isl.map(([i, j], k) => [
-    Math.max(0, i * step - (k ? half : TRIM.lead)),
-    Math.min(total, (j + 1) * step + (k < isl.length - 1 ? half : TRIM.tail)),
-  ]);
-  const keptSec = spans.reduce((n, [x, y]) => n + y - x, 0);
-  return { spans, totalSec: total, keptSec, gainSec: total - keptSec };
-}
-/* x : échantillons → { samples, sentSec, removedSec }, ou null s'il n'y a pas assez à gagner */
-function trimSilences(x, sr) {
-  const F = Math.round(sr * 0.02), nF = Math.ceil(x.length / F), db = new Float32Array(nF);
-  for (let f = 0; f < nF; f++) {
-    const o = f * F, m = Math.min(F, x.length - o); let s = 0;
-    for (let i = 0; i < m; i++) { const v = x[o + i]; s += v * v; }
-    db[f] = 20 * Math.log10(Math.sqrt(s / m) + 1e-9);
-  }
-  const plan = silenceSpans(db, F / sr);
-  if (!plan || plan.gainSec < TRIM.minGain) return null;
-  const parts = plan.spans.map(([a, b]) => x.subarray(Math.round(a * sr), Math.min(x.length, Math.round(b * sr))));
-  const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0)), fade = Math.round(sr * 0.005);
-  let o = 0;
-  parts.forEach((p, k) => { /* fondu de 5 ms à chaque raccord : pas de clic */
-    out.set(p, o);
-    for (let i = 0; i < fade && i < p.length; i++) {
-      if (k) out[o + i] *= i / fade;
-      if (k < parts.length - 1) out[o + p.length - 1 - i] *= i / fade;
-    }
-    o += p.length;
-  });
-  return { samples: out, sentSec: out.length / sr, removedSec: (x.length - out.length) / sr };
-}
 
-function cleanTranscript(t) {
-  let s = String(t || '').replace(/\r/g, '').trim();
-  s = s.replace(/^["“«`]+\s*|\s*["”»`]+$/g, '');
-  s = s.replace(/(^|[.!?…]\s+)[^.!?…]*sous-titr[^.!?…]*(amara|radio-canada|st'?\s?501)[^.!?…]*[.!?…]?/gi, '$1');
-  return s.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/* ------------------------------------------------------------
-   Commandes à la voix (v0.3) : « virgule », « point à la ligne »,
-   « nouveau paragraphe », « efface ça »… Whisper met souvent sa propre
-   ponctuation autour du mot dit : on l'absorbe avant de remplacer.
-   ------------------------------------------------------------ */
-const VOICE_CMDS = [
-  ['point à la ligne', '.\n'],
-  ['nouveau paragraphe', '\n\n'],
-  ['retour à la ligne', '\n'],
-  ['nouvelle ligne', '\n'],
-  ['point d[’\']interrogation', '?'],
-  ['point d[’\']exclamation', '!'],
-  ['point[- ]virgule', ';'],
-  ['point final', '.'],
-  ['virgule', ','],
-  ['ouvrez les guillemets', '« '],
-  ['fermez les guillemets', ' »'],
-];
-const ERASE_RE = /[\s,.;:!?…]*(?<!\p{L})(?:efface|supprime|efface-moi) (?:ça|cela|la dernière phrase)(?!\p{L})[\s,.;:!?…]*/giu;
-function applyVoiceCommands(text) {
-  let s = String(text || '');
-  if (!/virgule|ligne|paragraphe|point|guillemets|efface|supprime/i.test(s)) return s;
-  const before = s;
-  /* « efface ça » : retire la phrase qui précède la commande */
-  let m;
-  while ((m = ERASE_RE.exec(s))) {
-    const head = s.slice(0, m.index).replace(/[\s,;:]+$/, '');
-    const cut = Math.max(head.lastIndexOf('. ', head.length - 2), head.lastIndexOf('! ', head.length - 2), head.lastIndexOf('? ', head.length - 2), head.lastIndexOf('\n'));
-    const kept = cut >= 0 ? head.slice(0, cut + 1) : '';
-    s = kept + (kept && !/\n$/.test(kept) ? ' ' : '') + s.slice(m.index + m[0].length);
-    ERASE_RE.lastIndex = kept.length;
-  }
-  for (const [phrase, out] of VOICE_CMDS) {
-    /* on absorbe espaces et ponctuation autour, mais jamais un retour à la ligne déjà posé */
-    const re = new RegExp(`([ \\t\\u00A0,.;:!?…]*)(?<!\\p{L})${phrase}(?!\\p{L})[ \\t\\u00A0,.;:!?…]*`, 'giu');
-    s = s.replace(re, (_, lead) => {
-      if (out.startsWith('«')) return ' ' + out;
-      /* « Bonjour. Nouvelle ligne. » garde le point que Whisper avait mis */
-      if (out.startsWith('\n')) { const end = (lead.match(/[.!?…]/) || [''])[0]; return end + out; }
-      if (out.includes('\n')) return out;
-      return out + ' ';
-    });
-  }
-  if (s === before) return s;
-  /* majuscule après une fin de phrase ou un retour à la ligne */
-  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/[ \t]{2,}/g, ' ');
-  s = s.replace(/(^|[.!?]\s+|\n)(\p{Ll})/gu, (_, a, b) => a + b.toUpperCase());
-  return s.trim();
-}
 
 /* ------------------------------------------------------------
    Texte propre (v0.3) : un modèle de langue enlève les « euh », les
@@ -218,20 +61,6 @@ async function polishModel(pid, key) {
 /* « Coller en » (traduction) et ton selon l'app (bureau) : le même appel que le texte propre,
    avec la même protection (la dictée entre balises, jamais une consigne). Un seul appel fait tout. */
 const PASTE_LANGS = { fr: ['Français', 'français'], en: ['English', 'anglais'], es: ['Español', 'espagnol'] };
-/* nom du programme (« OUTLOOK.EXE », « olk.exe »…) → courriel, messagerie, code ou autre */
-const TONE_APPS = {
-  courriel: ['outlook.exe', 'olk.exe', 'hxoutlook.exe', 'winword.exe', 'thunderbird.exe', 'onenote.exe', 'soffice.bin', 'swriter.exe', 'wps.exe', 'mailbird.exe', 'emclient.exe'],
-  messagerie: ['ms-teams.exe', 'teams.exe', 'slack.exe', 'discord.exe', 'whatsapp.exe', 'whatsapp.root.exe', 'telegram.exe', 'signal.exe', 'messenger.exe', 'skype.exe', 'element.exe', 'mattermost.exe'],
-  code: ['code.exe', 'code - insiders.exe', 'cursor.exe', 'windsurf.exe', 'zed.exe', 'devenv.exe', 'studio64.exe', 'sublime_text.exe', 'notepad++.exe', 'windowsterminal.exe', 'wt.exe', 'openconsole.exe', 'conhost.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'powershell_ise.exe', 'wsl.exe', 'bash.exe', 'mintty.exe', 'wezterm-gui.exe', 'alacritty.exe', 'putty.exe'],
-};
-function appCategory(exe) {
-  const n = String(exe || '').split(/[\\/]/).pop().trim().toLowerCase();
-  if (!n) return 'autre';
-  for (const [cat, list] of Object.entries(TONE_APPS)) if (list.includes(n)) return cat;
-  /* JetBrains : idea64.exe, pycharm64.exe, webstorm64.exe, rider64.exe… */
-  if (/^(idea|pycharm|webstorm|phpstorm|rider|clion|goland|rubymine|datagrip|dataspell|fleet|rustrover|aqua)(64)?\.exe$/.test(n)) return 'code';
-  return 'autre';
-}
 const TONE_LINES = {
   courriel: 'Le texte va dans un courriel ou un document : écris-le dans un registre soigné et professionnel (phrases complètes, vocabulaire juste, ponctuation soignée).',
   messagerie: 'Le texte va dans une messagerie (Teams, Slack…) : garde un registre détendu et naturel, avec des phrases courtes et simples.',
