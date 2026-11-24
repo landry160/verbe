@@ -1551,6 +1551,57 @@ function analyzeSpeech(frames) {
   return { ok: n >= VOICE_FRAMES, measured: true, speechMs: n * 20, maxDb: max };
 }
 
+/* Silences coupés avant l'envoi. Avec l'arrêt automatique, une dictée finit par 10 s à 1 min
+   de silence : on ne l'envoie pas (moins de temps compté chez le service, réponse plus rapide,
+   et Whisper n'invente pas de phrases sur le vide). Voix = trame au-dessus de VOICE_DB, comme
+   pour l'arrêt automatique. On garde 0,4 s avant la première voix et 0,5 s après la dernière ;
+   une pause de plus de 2 s est ramenée à 0,7 s ; entre deux voix plus proches, rien n'est touché.
+   Moins de 2 s à gagner : l'audio part tel quel, sans être ré-encodé. */
+const TRIM = { lead: 0.4, tail: 0.5, maxPause: 2, keepPause: 0.7, minGain: 2 };
+/* frames : niveaux en dB par trame de step secondes → passages à garder, en secondes (null : aucune voix) */
+function silenceSpans(frames, step = 0.02) {
+  const total = frames.length * step, isl = [];
+  let a = -1, b = -1;
+  for (let i = 0; i < frames.length; i++) {
+    if (!(frames[i] > VOICE_DB)) continue;
+    if (a < 0) a = i;
+    else if ((i - b - 1) * step > TRIM.maxPause) { isl.push([a, b]); a = i; }
+    b = i;
+  }
+  if (a < 0) return null;
+  isl.push([a, b]);
+  const half = TRIM.keepPause / 2;
+  const spans = isl.map(([i, j], k) => [
+    Math.max(0, i * step - (k ? half : TRIM.lead)),
+    Math.min(total, (j + 1) * step + (k < isl.length - 1 ? half : TRIM.tail)),
+  ]);
+  const keptSec = spans.reduce((n, [x, y]) => n + y - x, 0);
+  return { spans, totalSec: total, keptSec, gainSec: total - keptSec };
+}
+/* x : échantillons → { samples, sentSec, removedSec }, ou null s'il n'y a pas assez à gagner */
+function trimSilences(x, sr) {
+  const F = Math.round(sr * 0.02), nF = Math.ceil(x.length / F), db = new Float32Array(nF);
+  for (let f = 0; f < nF; f++) {
+    const o = f * F, m = Math.min(F, x.length - o); let s = 0;
+    for (let i = 0; i < m; i++) { const v = x[o + i]; s += v * v; }
+    db[f] = 20 * Math.log10(Math.sqrt(s / m) + 1e-9);
+  }
+  const plan = silenceSpans(db, F / sr);
+  if (!plan || plan.gainSec < TRIM.minGain) return null;
+  const parts = plan.spans.map(([a, b]) => x.subarray(Math.round(a * sr), Math.min(x.length, Math.round(b * sr))));
+  const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0)), fade = Math.round(sr * 0.005);
+  let o = 0;
+  parts.forEach((p, k) => { /* fondu de 5 ms à chaque raccord : pas de clic */
+    out.set(p, o);
+    for (let i = 0; i < fade && i < p.length; i++) {
+      if (k) out[o + i] *= i / fade;
+      if (k < parts.length - 1) out[o + p.length - 1 - i] *= i / fade;
+    }
+    o += p.length;
+  });
+  return { samples: out, sentSec: out.length / sr, removedSec: (x.length - out.length) / sr };
+}
+
 function cleanTranscript(t) {
   let s = String(t || '').replace(/\r/g, '').trim();
   s = s.replace(/^["“«`]+\s*|\s*["”»`]+$/g, '');
@@ -1701,7 +1752,22 @@ function mediaDuration(blob) {
 /* Prépare l'envoi : tel quel si possible (rapide), sinon décodage local puis
    morceaux WAV de ~5 min envoyés en parallèle. Pas de limite de longueur. */
 const LONG_MS = 10 * 60 * 1000;
-async function prepareSegments(blob, P, { name = '', durationMs = 0, onStage } = {}) {
+/* Dictée au micro avec des silences : décodage local, silences coupés, puis WAV 16 kHz mono
+   (32 ko/s) en morceaux de 5 à 6 min au plus (11,5 Mo), sous la limite des 4 services (Gemini, la
+   plus basse : 14 Mo). null : rien à gagner ou décodage impossible, l'audio part tel quel. */
+async function trimmedSegments(blob) {
+  let pcm, cut;
+  try { pcm = await decodeToMono16k(blob); cut = trimSilences(pcm, 16000); }
+  catch (e) { console.warn('[Verbe] silences gardés', e); return null; }
+  if (!cut) return null;
+  const parts = splitAtSilences(cut.samples, 16000, 300, 25);
+  return {
+    segments: parts.map((s, i) => ({ blob: encodeWav(s, 16000), filename: `partie-${i + 1}.wav`, mime: 'audio/wav', sec: s.length / 16000 })),
+    durationMs: Math.round(pcm.length / 16), /* la durée enregistrée ; le compteur suit ce qui est envoyé (sec) */
+  };
+}
+async function prepareSegments(blob, P, { name = '', durationMs = 0, onStage, trim = false } = {}) {
+  if (trim) { const t = await trimmedSegments(blob); if (t) return t; }
   const ext = extOf(name, blob.type);
   const isVideo = /^video\//.test(blob.type || '') || ['mov', 'mkv', 'avi'].includes(ext);
   const direct = !isVideo && OK_EXT.includes(ext) && blob.size <= P.maxBytes && durationMs > 0 && durationMs <= LONG_MS;
@@ -1786,9 +1852,9 @@ async function callProvider(pid, seg, { key, model, lang, signal }) {
 }
 
 /* Transcription complète (avec découpage et envoi en parallèle) */
-async function transcribe(blob, { pid, name = '', durationMs = 0, onProgress } = {}) {
+async function transcribe(blob, { pid, name = '', durationMs = 0, onProgress, trim = false } = {}) {
   const P = PROVIDERS[pid], key = (Settings.d.keys[pid] || '').trim(), model = modelOf(pid), lang = Settings.d.lang;
-  const prep = await prepareSegments(blob, P, { name, durationMs, onStage: s => onProgress?.({ stage: s }) });
+  const prep = await prepareSegments(blob, P, { name, durationMs, trim, onStage: s => onProgress?.({ stage: s }) });
   const segs = prep.segments, out = new Array(segs.length), ctrl = new AbortController();
   let next = 0, done = 0;
   onProgress?.({ done: 0, total: segs.length, durationMs: prep.durationMs });
@@ -2665,8 +2731,9 @@ const App = {
       return this.finish(item, r.text, tStop);
     }
     const item = this.newItem({ source: 'micro', durationMs: r.durationMs });
-    await this.saveItem(item, r.blob);
-    await this.runTranscription(item, r.blob, { tStop });
+    await this.saveItem(item, r.blob); /* l'historique garde l'enregistrement d'origine, silences compris */
+    const plan = silenceSpans(Rec.frames), trim = !!plan && plan.gainSec >= TRIM.minGain; /* sinon : envoyé tel quel */
+    await this.runTranscription(item, r.blob, { tStop, trim });
   },
 
   newItem({ source, durationMs = 0, fileName = '', provider }) {
@@ -2721,14 +2788,14 @@ const App = {
     }
   },
 
-  async runTranscription(item, blob, { tStop = now(), name = '' } = {}) {
+  async runTranscription(item, blob, { tStop = now(), name = '', trim = false } = {}) {
     this.setState('transcribing');
     const pid = this.pid;
     Object.assign(item, { status: 'pending', provider: pid, model: modelOf(pid), error: '' });
     UI.renderHistory();
     try {
       const out = await transcribe(blob, {
-        pid, name, durationMs: item.durationMs,
+        pid, name, durationMs: item.durationMs, trim,
         onProgress: p => { if (p.durationMs) item.durationMs = p.durationMs; Island.setProgress(p); },
       });
       await this.finish(item, out.text, tStop);
@@ -2803,7 +2870,8 @@ const App = {
     if (!blob) { Toast.show({ type: 'error', text: 'L’audio de cette dictée n’est plus disponible.' }); return; }
     if (this.needsKey() || PROVIDERS[this.pid].kind === 'webspeech') return this.blocked('Choisis un service avec une clé pour réessayer.', 'Clique ici pour ouvrir Réglages.');
     Island.show('transcribing', { label: 'Nouvel essai' });
-    await this.runTranscription(item, blob, { tStop: now(), name: item.fileName || '' });
+    /* dictée au micro : ses silences sont coupés à nouveau (les fichiers importés partent tels quels) */
+    await this.runTranscription(item, blob, { tStop: now(), name: item.fileName || '', trim: item.source === 'micro' });
   },
 
   async remove(id) {
@@ -3534,6 +3602,7 @@ function init() {
   Mics.refresh().then(() => { UI.renderMics(); UI.renderChips(); });
   if (Desktop) wireDesktop();
   window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
+  Object.assign(window.Verbe, { silenceSpans, trimSilences, TRIM }); /* silences coupés avant l'envoi */
 }
 init();
 }

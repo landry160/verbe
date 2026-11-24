@@ -55,6 +55,13 @@ Groq renvoie les requêtes restantes dans chaque réponse, mais un navigateur ne
 l'app bureau les rend lisibles. Sinon, Verbe compte ce que l'appareil a envoyé sur 24 h.
 OpenAI et Mistral sont payés à l'usage : Verbe affiche l'audio envoyé et son coût estimé.
 
+**Silences coupés avant l'envoi** (rien à régler) : le silence du début et de la fin d'une dictée au micro
+ne part pas (Verbe garde 0,4 s avant la voix et 0,5 s après), et une pause de plus de 2 s est ramenée à 0,7 s.
+Moins de temps compté, une réponse plus rapide, et pas de phrase inventée sur le vide. Une dictée sans silence
+notable (moins de 2 s à gagner) part telle quelle ; sinon, l'audio coupé part en WAV (environ 1,9 Mo par minute
+de voix, en morceaux de 5 min au plus). Le compteur compte l'audio envoyé. L'historique garde l'enregistrement
+d'origine, et « Retranscrire » coupe ses silences à nouveau. Les fichiers importés partent tels quels.
+
 ## Développement
 
 ```
@@ -80,7 +87,8 @@ npm run test:bureau               # l'app Electron (Windows)
 ```
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
-  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement.
+  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement,
+  silences coupés avant l'envoi.
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
   presse-papiers rendu après le collage.
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
