@@ -90,14 +90,23 @@ test('une version plus récente se télécharge, puis « Redémarrer maintenant 
     // le téléchargement est resté dans le profil de test, et le fichier (non signé) a été accepté
     expect(fs.readFileSync(path.join(profil, 'maj-cache', 'pending', 'Verbe-Setup.exe'))).toEqual(FAUX);
 
+    // comme sur iOS : un point rouge sur Réglages et sur Général, le résumé le dit, et un message une seule fois
+    const point = sel => v.page.evaluate(q => getComputedStyle(document.querySelector(q), '::after').backgroundColor, sel);
+    expect(await point('.tab[data-v="reglages"]')).toBe('rgb(255, 59, 48)');
+    expect(await point('.reg-tab[data-sec="general"] .reg-ic')).toBe('rgb(255, 59, 48)');
+    await expect(v.page.locator('[data-sum="general"]')).toHaveText('Version 99.0.0 prête');
+    await expect(v.page.locator('.toast', { hasText: 'Verbe 99.0.0 est prête.' })).toHaveCount(1);
+    await v.page.locator('.toast', { hasText: 'Verbe 99.0.0 est prête.' }).locator('.t-act').click();
+    await expect.poll(async () => (await v.etat()).installations).toBe(1);
+
     // menu de l'icône près de l'horloge
     expect((await v.app.evaluate(() => global.verbeMaj.menu())).some(l => l.startsWith('Redémarrer maintenant'))).toBe(true);
 
     // les deux boutons demandent l'installation ; en mode test, rien ne s'installe (simple compteur)
     await v.page.click('#maj-redemarrer');
-    await expect.poll(async () => (await v.etat()).installations).toBe(1);
-    await v.app.evaluate(() => global.verbeMaj.cliquer('Redémarrer maintenant'));
     await expect.poll(async () => (await v.etat()).installations).toBe(2);
+    await v.app.evaluate(() => global.verbeMaj.cliquer('Redémarrer maintenant'));
+    await expect.poll(async () => (await v.etat()).installations).toBe(3);
     expect(await v.app.evaluate(({ app }) => app.isReady())).toBe(true); // l'app tourne toujours
     expect(v.erreurs).toEqual([]);
   } finally {
