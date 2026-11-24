@@ -23,6 +23,11 @@ const TYPES = {
 http
   .createServer((req, res) => {
     let chemin = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    // une page vide de la même adresse : les tests y posent les réglages avant d'ouvrir Verbe
+    if (chemin === '/__vide') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end('<!doctype html><meta charset="utf-8"><title>vide</title>');
+    }
     if (chemin.endsWith('/')) chemin += 'index.html';
     const fichier = normalize(join(RACINE, chemin));
     if (!fichier.startsWith(RACINE)) {

@@ -1,5 +1,5 @@
 // Réglages : une section à la fois, en-tête aligné, téléphone, position de la bulle par défaut.
-const { test, expect, REGLAGES, ouvrir, pret } = require('./aides');
+const { test, expect, REGLAGES, ouvrir, rouvrir } = require('./aides');
 
 const SECTIONS = ['transcription', 'micro', 'raccourci', 'texte', 'bulle', 'general'];
 const sectionsVisibles = page => page.evaluate(() => [...document.querySelectorAll('#v-reglages .pane')].filter(p => p.offsetParent).map(p => p.dataset.sec));
@@ -64,17 +64,18 @@ test('sur ordinateur, la liste et la section sont ensemble, sans bouton retour',
   await expect(page.locator('.pane-back:visible')).toHaveCount(0);
 });
 
-test('la bulle est en bas par défaut ; l’ancien « Centre » passe une fois à « Bas »', async ({ page }) => {
+test('nouvelle installation : la bulle est en bas au centre', async ({ page }) => {
   await ouvrir(page, { reglages: null });
-  expect(await page.evaluate(() => window.Verbe.Settings.d.islandPos), 'nouvelle installation').toBe('bottom');
+  expect(await page.evaluate(() => window.Verbe.Settings.d.islandPos)).toBe('bottom');
+});
 
+test('l’ancien « Centre » passe une fois à « Bas » ; « Centre » choisi ensuite est respecté', async ({ page }) => {
   await ouvrir(page, { reglages: { provider: 'groq', keys: { groq: 'gsk_test' }, islandPos: 'center', scV: 2, fixV: 1 } });
   expect(await page.evaluate(() => window.Verbe.Settings.d.islandPos), 'ancien « Centre »').toBe('bottom');
 
   await page.evaluate(() => { const S = window.Verbe.Settings; S.d.islandPos = 'center'; S.save(); });
-  await page.reload();
-  await pret(page);
-  expect(await page.evaluate(() => window.Verbe.Settings.d.islandPos), '« Centre » choisi ensuite').toBe('center');
+  const plusTard = await rouvrir(page);
+  expect(await plusTard.evaluate(() => window.Verbe.Settings.d.islandPos), '« Centre » choisi ensuite').toBe('center');
 });
 
 test.describe('sur téléphone', () => {

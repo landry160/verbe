@@ -1,5 +1,5 @@
 // Dicter : le raccourci partout, le micro flottant, Échap, une page qui ne défile pas.
-const { test, expect, ouvrir, pret, attendreEtat } = require('./aides');
+const { test, expect, ouvrir, rouvrir, attendreEtat } = require('./aides');
 
 test('un ancien raccourci Ctrl + V redevient Ctrl + Maj + L, et l’accueil le dit', async ({ page }) => {
   await ouvrir(page, {
@@ -15,14 +15,13 @@ test('Dicter tient dans l’écran sans défiler, même avec une longue dernièr
     const texte = 'Une longue dictée pour vérifier que la page Dicter ne défile jamais, même quand la dernière dictée prend beaucoup de place. '.repeat(4);
     await window.Verbe.Store.put({ id: 'longue', createdAt: Date.now(), text: texte, status: 'ok', error: '', source: 'micro', durationMs: 34000, fileName: '', provider: 'groq', model: 'whisper-large-v3-turbo', latencyMs: 3900, words: 120, hasAudio: false });
   });
-  await page.reload();
-  await pret(page);
+  const verbe = await rouvrir(page);
   // la longue dictée est bien affichée : sinon le test passerait sans rien vérifier
-  await expect(page.locator('#last-text')).toHaveValue(/^Une longue dictée/);
+  await expect(verbe.locator('#last-text')).toHaveValue(/^Une longue dictée/);
   for (const [width, height] of [[1536, 730], [1366, 768], [1280, 720], [1920, 1000]]) {
-    await page.setViewportSize({ width, height });
+    await verbe.setViewportSize({ width, height });
     await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight), { message: `${width} × ${height}` })
+      .poll(() => verbe.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight), { message: `${width} × ${height}` })
       .toBeLessThanOrEqual(1);
   }
 });
@@ -79,7 +78,7 @@ test.describe('sur téléphone', () => {
   test('Dicter et Historique ne défilent pas sur le côté', async ({ page }) => {
     await ouvrir(page);
     for (const vue of ['#dicter', '#historique']) {
-      await page.goto('/app/verbe.html' + vue);
+      await page.evaluate(h => { location.hash = h; }, vue); // on change de vue dans Verbe, sans quitter la page
       await expect
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), { message: vue })
         .toBeLessThanOrEqual(0);
