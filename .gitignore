@@ -1,0 +1,6 @@
+# dépendances et installateurs construits (les installateurs vont dans les « Releases » GitHub)
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
