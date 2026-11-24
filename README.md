@@ -34,12 +34,16 @@ des compteurs de limite.
 2. La première fois, colle ta clé Groq dans **Réglages › Transcription**.
 3. Dans n'importe quelle app : **Ctrl + Maj + L**, parle, **Ctrl + Maj + L**. Le texte arrive là où était ton curseur.
 4. **Échap** annule pendant l'écoute. Fermer la fenêtre range Verbe près de l'horloge ; « Quitter Verbe » dans son menu l'arrête.
+5. **Mises à jour** : quelques secondes après son démarrage, puis toutes les 6 h, Verbe regarde s'il y a une nouvelle version,
+   la télécharge en arrière-plan et l'installe quand tu le quittes. « Redémarrer maintenant » (Réglages › Général, ou le menu
+   de l'icône près de l'horloge) l'installe tout de suite. L'interrupteur « Mises à jour automatiques » (actif par défaut) et
+   le bouton « Vérifier maintenant » sont dans Réglages › Général. La version web, elle, est toujours à jour.
 
 ## Réglages
 
 Une section à la fois : Transcription (service, clé, langue, **ce qu'il te reste**), Micro, Raccourci,
 Texte (commandes à la voix, texte propre, collage), Bulle (forme Barres / Onde / Points dessinée
-en ligne de part et d’autre du micro, position en bas par défaut, sons, aperçu) et Général (apparence, lancement avec Windows, audio gardé, historique).
+en ligne de part et d’autre du micro, position en bas par défaut, sons, aperçu) et Général (apparence, lancement avec Windows, mises à jour automatiques, audio gardé, historique).
 
 ## Commandes à la voix
 
@@ -68,10 +72,13 @@ d'origine, et « Retranscrire » coupe ses silences à nouveau. Les fichiers imp
 npm install            # installe Electron et electron-builder
 npm start              # lance la version bureau (sans ELECTRON_RUN_AS_NODE dans l'environnement)
 npm run raccourci      # recrée les raccourcis Bureau et menu Démarrer (version de développement)
-npm run installateur   # construit dist\Verbe-Setup-<version>.exe
+npm run installateur   # construit dist\Verbe-Setup.exe, dist\latest.yml et dist\Verbe-Setup.exe.blockmap
 ```
 
 - Tester sans toucher les vrais réglages : `electron . --profil=<dossier>` (profil à part).
+- Mises à jour : la version de développement ne vérifie jamais (`app.isPackaged` faux). Pour essayer quand même :
+  `electron . --profil=<dossier> --maj-test=http://127.0.0.1:<port>/`, avec un serveur local qui sert un `latest.yml`
+  (fournisseur « generic »). En mode test, le téléchargement reste dans le profil et rien ne s'installe.
 - Si `npm run installateur` échoue sur « Cannot create symbolic link » (outil winCodeSign) :
   décompresser l'archive du cache `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\*.7z` dans
   `winCodeSign-2.6.0` avec `node_modules\7zip-bin\win\x64\7za.exe x … -o…` (les 2 erreurs sur des fichiers Mac sont sans effet), puis relancer.
@@ -90,7 +97,8 @@ npm run test:bureau               # l'app Electron (Windows)
   « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement,
   silences coupés avant l'envoi.
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
-  presse-papiers rendu après le collage.
+  presse-papiers rendu après le collage, mises à jour (nouvelle version, à jour, interrupteur coupé, version de
+  développement) avec un serveur local et un faux installateur, jamais lancé.
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
   Le micro est un faux micro de Chromium qui joue un son continu.
 - Rien de personnel n'est touché : la version bureau tourne dans un profil à part (`--profil=`),
@@ -100,11 +108,27 @@ npm run test:bureau               # l'app Electron (Windows)
 
 ## Publier une version
 
-1. Monter la version dans `package.json` (et le pied de Réglages › Général), puis `npm run installateur`.
-2. Créer une version (« Release ») sur GitHub et y joindre l'installateur sous le nom **`Verbe-Setup.exe`** :
-   le lien `https://github.com/landry160/verbe/releases/latest/download/Verbe-Setup.exe` mène alors toujours à la dernière version.
-3. Ce lien est dans `DOWNLOAD_URL` (`app/verbe.html`) : le bouton « Télécharger pour Windows » apparaît dans la version web (Réglages › Raccourci), seulement sur un ordinateur Windows.
-4. Plus tard : mises à jour automatiques (electron-updater) et signature du code.
+1. Monter la version dans `package.json` (et le pied de Réglages › Général).
+2. **Automatique** : créer puis pousser l'étiquette `v<version>` (par exemple `v0.4.7`).
+   `.github/workflows/release.yml` construit alors l'installateur sous Windows et publie la version GitHub avec les trois fichiers.
+3. **À la main**, si besoin : `npm run installateur`, puis créer une version (« Release ») sur GitHub avec l'étiquette
+   `v<version>` et y joindre les **trois** fichiers de `dist`, sans les renommer :
+   - **`Verbe-Setup.exe`** : l'installateur ;
+   - **`latest.yml`** : la version, le nom et l'empreinte (sha512) de l'installateur ; c'est ce que lisent les mises à jour automatiques ;
+   - **`Verbe-Setup.exe.blockmap`** : permet de ne télécharger que ce qui a changé.
+
+   L'installateur s'appelle déjà `Verbe-Setup.exe` (`artifactName` dans `package.json`) : ne plus le renommer,
+   sinon `latest.yml` nommerait un fichier absent. Le lien `https://github.com/landry160/verbe/releases/latest/download/Verbe-Setup.exe`
+   mène toujours à la dernière version.
+4. Ce lien est dans `DOWNLOAD_URL` (`app/verbe.html`) : le bouton « Télécharger pour Windows » apparaît dans la version web (Réglages › Raccourci), seulement sur un ordinateur Windows.
+5. Les versions installées qui ont les mises à jour automatiques trouvent la nouvelle version seules : electron-updater lit
+   la dernière version GitHub publiée (pas les brouillons ni les préversions). Les versions plus anciennes (0.4.6 et avant)
+   se mettent à jour une dernière fois à la main.
+
+**Signature.** L'app n'est pas signée. electron-updater ne vérifie la signature du nouvel installateur que si
+`app-update.yml` (écrit dans l'app par electron-builder) contient un `publisherName`, ce qui n'arrive qu'avec un certificat.
+Sans signature, la mise à jour est donc acceptée ; seule l'empreinte sha512 donnée par `latest.yml` est vérifiée.
+Le jour où l'app sera signée, chaque version suivante devra l'être avec le même certificat, sinon elle sera refusée.
 
 ## Licences
 
