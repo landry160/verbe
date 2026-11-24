@@ -505,6 +505,34 @@ details.adv > .field { margin-top: 6px; }
 .modal-wrap { position: fixed; inset: 0; z-index: 80; background: rgba(28,23,20,.4); display: grid; place-items: center; padding: 16px; }
 .modal { width: min(460px, 100%); border-radius: 32px; padding: 24px; background: var(--surface-strong); display: grid; gap: 14px; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
 .modal p { margin: 0; color: var(--fg-2); }
+/* Nouveautés (v0.5.2) : après une mise à jour, une fenêtre courte, une nouveauté par page */
+.news { position: relative; width: min(720px, 100%); padding: 0; gap: 0; overflow: hidden; grid-template-columns: 250px minmax(0, 1fr);
+  /* opaque : le verre laissait voir la page derrière le texte */
+  background: linear-gradient(var(--surface-strong), var(--surface-strong)), var(--bg); box-shadow: 0 30px 80px rgba(28,18,10,.35); }
+.news-art { position: relative; display: grid; place-items: center; min-height: 300px; overflow: hidden; background: var(--gradient-primary); color: #fff; }
+.news-art::before, .news-art::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+.news-art::before { width: 240px; height: 240px; top: -70px; right: -90px; background: rgba(255,255,255,.12); }
+.news-art::after { width: 190px; height: 190px; bottom: -80px; left: -60px; background: rgba(60,25,5,.14); }
+.news-ver { position: absolute; z-index: 1; left: 20px; top: 20px; font: 800 11px/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.88); }
+.news-ic { position: relative; z-index: 1; width: 108px; height: 108px; border-radius: 30px; display: grid; place-items: center; background: rgba(255,255,255,.16); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 14px 32px rgba(60,25,5,.28); }
+.news-ic svg { width: 52px; height: 52px; }
+.news-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 30px 28px 24px; }
+.news-kick { margin: 0; font: 800 11px/1.3 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--text-accent); }
+.news-body h2 { margin: 0; font: 900 28px/1.1 var(--font); letter-spacing: -.02em; color: var(--fg); }
+.news-body p.news-txt { font-size: 16px; line-height: 1.5; }
+.news-dots { display: flex; gap: 6px; margin-top: auto; padding-top: 8px; }
+.news-dots i { width: 8px; height: 8px; border-radius: 4px; background: var(--line-3); transition: width .25s var(--ease), background-color .25s; }
+.news-dots i.on { width: 24px; background: var(--primary); }
+.news-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.news-step { animation: fadeIn .25s ease; }
+@media (max-width: 640px) {
+  .news { grid-template-columns: minmax(0, 1fr); }
+  .news-art { min-height: 150px; }
+  .news-ic { width: 76px; height: 76px; border-radius: 22px; } .news-ic svg { width: 38px; height: 38px; }
+  .news-body { padding: 22px 20px 20px; } .news-body h2 { font-size: 23px; }
+}
+@media (prefers-reduced-motion: reduce) { .news-step { animation: none; } .news-dots i { transition: none; } }
+.foot button { background: none; border: 0; padding: 0; font: inherit; color: var(--text-accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .m-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
 @media (prefers-reduced-motion: no-preference) { .modal { animation: pop .3s var(--ease); } }
 
@@ -1123,7 +1151,7 @@ body.dictee-miroir :is(#mic, #mic-cap, #dock) { visibility: hidden; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v0.5.2</p>
+          <p class="foot">Verbe v<span id="app-version">0.5.2</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
         </section>
 
       </div>
@@ -4240,19 +4268,83 @@ function wireUpdates() {
     $('#maj-verifier').disabled = s.etat === 'checking' || s.etat === 'downloading';
   };
   Desktop.onUpdate(render);
-  Desktop.setAutoUpdate(Settings.d.autoUpdate !== false).then(s => {
-    render(s);
-    /* premier lancement après une mise à jour : on le dit, une fois */
-    try {
-      const avant = localStorage.getItem('verbe.version');
-      if (s && s.courante && avant && avant !== s.courante) Toast.show({ type: 'ok', text: `Verbe ${s.courante} est installé.`, sub: 'La mise à jour s’est faite toute seule.', duration: 6000 });
-      if (s && s.courante) localStorage.setItem('verbe.version', s.courante);
-    } catch (e) { /* stockage indisponible : rien à dire */ }
-  });
+  Desktop.setAutoUpdate(Settings.d.autoUpdate !== false).then(render); /* après une mise à jour, la fenêtre des Nouveautés le dit */
   $('#maj-switch').addEventListener('click', () => Desktop.setAutoUpdate(Settings.d.autoUpdate).then(render));
   $('#maj-verifier').addEventListener('click', () => Desktop.checkUpdate().then(render));
   $('#maj-redemarrer').addEventListener('click', () => Desktop.installUpdate());
 }
+
+/* ------------------------------------------------------------
+   Nouveautés (v0.5.2) : après une mise à jour, une fenêtre présente ce
+   qui change, une nouveauté par page, une seule fois par version.
+   Réglages › Général › « Nouveautés » la rouvre. À chaque version :
+   monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
+   ------------------------------------------------------------ */
+const VERSION = '0.5.2';
+const NOUVEAUTES = [
+  { v: '0.5.2', icon: 'audioLines', desk: true, title: 'La même voix partout', text: 'Pendant la dictée, la fenêtre de Verbe montre la même pastille que la bulle, à la place du micro.' },
+  { v: '0.5.2', icon: 'download', desk: true, title: 'Des mises à jour qui se voient', text: 'Pendant l’installation, Verbe te prévient et se rouvre tout seul : pas besoin de le relancer.' },
+  { v: '0.5.1', icon: 'copy', desk: true, title: 'Ta dictée reste dans le presse-papiers', text: 'Collée au mauvais endroit ? Clique où tu veux et fais Ctrl + V. Et Ctrl + Maj + 9 recolle la dernière dictée.' },
+  { v: '0.5.1', icon: 'mic', desk: true, title: 'Une bulle plus fine', text: 'Un tiers plus mince, le même style : elle se fait discrète pendant que tu parles.' },
+];
+/* une nouvelle installation n'a rien à découvrir : on le sait avant que les réglages s'enregistrent */
+const DEJA_LA = (() => { try { return !!localStorage.getItem('verbe.reglages.v1'); } catch (e) { return false; } })();
+const cmpVer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+const News = {
+  key: 'verbe.nouveautes',
+  seen() { try { return localStorage.getItem(this.key); } catch (e) { return VERSION; } },
+  mark() { try { localStorage.setItem(this.key, VERSION); } catch (e) { /* stockage indisponible */ } },
+  /* ce qui est nouveau depuis la version vue (dans la version web : seulement ce qui la concerne) */
+  since(after) { return NOUVEAUTES.filter(n => cmpVer(n.v, after) > 0 && cmpVer(n.v, VERSION) <= 0 && (Desktop || !n.desk)); },
+  maybeShow() {
+    if (IS_BUBBLE) return;
+    let vu = this.seen();
+    if (!vu) { if (!DEJA_LA) { this.mark(); return; } vu = '0.5.0'; } /* avant la 0.5.2, rien n'était noté */
+    const list = this.since(vu);
+    if (list.length) this.open(list); else this.mark();
+  },
+  open(list = NOUVEAUTES.filter(n => n.v === VERSION && (Desktop || !n.desk))) {
+    if (!list.length || $('#news')) return;
+    let i = 0;
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap'; wrap.id = 'news';
+    wrap.innerHTML = `<div class="modal news" role="dialog" aria-modal="true" aria-labelledby="news-title">
+      <div class="news-art" aria-hidden="true"><span class="news-ver">Verbe ${VERSION}</span><span class="news-ic"></span></div>
+      <div class="news-body">
+        <div class="news-step"><p class="news-kick"></p><h2 id="news-title"></h2><p class="news-txt"></p></div>
+        <div class="news-dots" aria-hidden="true">${list.map(() => '<i></i>').join('')}</div>
+        <div class="news-actions"><button class="btn btn-2 btn-sm" type="button" data-n="skip">Passer</button><button class="btn btn-1" type="button" data-n="next"></button></div>
+      </div></div>`;
+    const step = wrap.querySelector('.news-body > div'), next = wrap.querySelector('[data-n="next"]');
+    const show = () => {
+      const n = list[i], last = i === list.length - 1;
+      wrap.querySelector('.news-ic').innerHTML = icon(n.icon, 52);
+      wrap.querySelector('.news-kick').textContent = list.length > 1 ? `Nouveau dans Verbe ${VERSION} · ${i + 1} / ${list.length}` : `Nouveau dans Verbe ${VERSION}`;
+      wrap.querySelector('#news-title').textContent = n.title;
+      wrap.querySelector('.news-txt').textContent = n.text;
+      wrap.querySelectorAll('.news-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+      next.textContent = last ? 'C’est parti' : 'Suivant';
+      wrap.querySelector('[data-n="skip"]').style.visibility = last ? 'hidden' : '';
+      step.classList.remove('news-step'); void step.offsetWidth; step.classList.add('news-step');
+    };
+    const close = () => { this.mark(); wrap.remove(); document.removeEventListener('keydown', onKey, true); this.back?.focus?.(); };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+      else if (e.key === 'ArrowRight' && i < list.length - 1) { i++; show(); }
+      else if (e.key === 'ArrowLeft' && i > 0) { i--; show(); }
+    };
+    wrap.addEventListener('click', e => {
+      if (e.target === wrap) return close();
+      const b = e.target.closest('[data-n]'); if (!b) return;
+      if (b.dataset.n === 'skip' || i === list.length - 1) return close();
+      i++; show(); next.focus();
+    });
+    document.addEventListener('keydown', onKey, true);
+    this.back = document.activeElement;
+    document.body.appendChild(wrap);
+    show(); next.focus();
+  },
+};
 
 /* ============================================================
    12. Démarrage
@@ -4266,6 +4358,10 @@ function init() {
   $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(fav);
   Island.init();
   App.setState('idle');
+  $('#app-version').textContent = VERSION;
+  $('#btn-news').addEventListener('click', () => News.open());
+  $('#news-link').hidden = !NOUVEAUTES.some(n => n.v === VERSION && (Desktop || !n.desk)); /* rien de neuf ici : pas de lien */
+  setTimeout(() => News.maybeShow(), 600); /* après l'ouverture : la page se pose d'abord */
   UI.renderShortcut();
   UI.renderChips();
   UI.renderLast();

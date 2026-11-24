@@ -123,6 +123,7 @@ async function ouvrir(page, { hash = '', reglages = REGLAGES, avant } = {}) {
   await page.evaluate(r => {
     localStorage.clear();
     if (r) localStorage.setItem('verbe.reglages.v1', JSON.stringify(r));
+    localStorage.setItem('verbe.nouveautes', '99.0.0'); // la fenêtre des Nouveautés ne s'ouvre pas dans les tests (sauf les siens)
   }, reglages);
   if (avant) await page.evaluate(avant);
   await page.goto('/app/verbe.html' + hash);

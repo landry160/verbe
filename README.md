@@ -175,7 +175,10 @@ npm run test:bureau               # l'app Electron (Windows)
 
 ## Publier une version
 
-1. Monter la version dans `package.json` (et le pied de Réglages › Général).
+1. Monter la version dans `package.json` et dans `VERSION` (`app/verbe.html`, un test vérifie qu'elles sont pareilles),
+   puis ajouter ses nouveautés en tête de `NOUVEAUTES` (icône, titre, une phrase ; `desk: true` si elle ne concerne
+   que Windows). Après la mise à jour, Verbe les présente une fois dans la fenêtre des Nouveautés ;
+   Réglages › Général › « Nouveautés » la rouvre.
 2. **Automatique** : créer puis pousser l'étiquette `v<version>` (par exemple `v0.4.7`).
    `.github/workflows/release.yml` construit alors l'installateur sous Windows et publie la version GitHub avec les trois fichiers.
 3. **À la main**, si besoin : `npm run installateur`, puis créer une version (« Release ») sur GitHub avec l'étiquette
