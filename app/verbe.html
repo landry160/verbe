@@ -867,6 +867,18 @@ html.bulle body > :not(#island) { display: none !important; }
                 </div>
               </div>
             </div>
+            <div class="srow srow-stack">
+              <div class="srow-t"><span class="flabel" id="autostop-label">Arrêt quand tu ne parles plus</span><p class="help">Après ce silence, Verbe s’arrête et libère le micro pour tes autres apps. Il transcrit ce qu’il a entendu ; s’il n’a rien entendu, il n’envoie rien.</p></div>
+              <div class="srow-c">
+                <div class="seg" role="group" aria-labelledby="autostop-label" data-setting="autoStop">
+                  <button type="button" data-value="10">10 s</button>
+                  <button type="button" data-value="20">20 s</button>
+                  <button type="button" data-value="30">30 s</button>
+                  <button type="button" data-value="60">1 min</button>
+                  <button type="button" data-value="0">Jamais</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -999,7 +1011,7 @@ html.bulle body > :not(#island) { display: none !important; }
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v0.4.5</p>
+          <p class="foot">Verbe v0.4.6</p>
         </section>
 
       </div>
@@ -1161,6 +1173,7 @@ const DEFAULTS = {
   voiceCmds: true,
   autoClean: false,
   autoPaste: true,
+  autoStop: '20', /* secondes sans voix avant l'arrêt automatique ; '0' = jamais */
   llm: {},
 };
 
@@ -1529,11 +1542,13 @@ function splitAtSilences(x, sr, targetSec = 300, windowSec = 25) {
 /* Y a-t-il de la voix ? Une trame de 20 ms compte si elle dépasse -46 dBFS.
    Il en faut 8 (160 ms) : ça évite d'envoyer du silence, sur lequel Whisper
    « hallucine » des phrases comme « Sous-titrage Société Radio-Canada ». */
+/* une trame de 20 ms compte comme de la voix au-dessus de -46 dB ; il en faut 8 (160 ms) */
+const VOICE_DB = -46, VOICE_FRAMES = 8;
 function analyzeSpeech(frames) {
   if (frames.length < 5) return { ok: true, measured: false };
   let n = 0, max = -200;
-  for (const d of frames) { if (d > -46) n++; if (d > max) max = d; }
-  return { ok: n >= 8, measured: true, speechMs: n * 20, maxDb: max };
+  for (const d of frames) { if (d > VOICE_DB) n++; if (d > max) max = d; }
+  return { ok: n >= VOICE_FRAMES, measured: true, speechMs: n * 20, maxDb: max };
 }
 
 function cleanTranscript(t) {
@@ -1919,7 +1934,7 @@ class FreeRecognizer {
 
 const Rec = {
   active: false, stream: null, meter: null, node: null, mr: null, chunks: [], mime: '', t0: 0,
-  frames: [], fallback: 0, free: null, onEnded: null, realm: null,
+  frames: [], fallback: 0, free: null, onEnded: null, realm: null, voiced: 0, lastVoice: 0,
   async open() {
     const id = Settings.d.micId;
     const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
@@ -1955,15 +1970,15 @@ const Rec = {
     this.t0 = now();
     const ctx = await ctxP;
     this.meter = new Meter(ctx, this.stream);
-    this.frames = [];
+    this.frames = []; this.voiced = 0; this.lastVoice = now();
     try {
       await AudioEngine.worklet(ctx);
       this.node = new AudioWorkletNode(ctx, 'verbe-niveau', { numberOfInputs: 1, numberOfOutputs: 0 });
-      this.node.port.onmessage = e => { this.frames.push(20 * Math.log10(e.data + 1e-9)); };
+      this.node.port.onmessage = e => this.frame(20 * Math.log10(e.data + 1e-9));
       this.meter.src.connect(this.node);
     } catch (e) {
       this.node = null;
-      this.fallback = setInterval(() => { if (this.meter) this.frames.push(this.meter.read().db); }, 20);
+      this.fallback = setInterval(() => { if (this.meter) this.frame(this.meter.read().db); }, 20);
     }
     if (useFree) {
       this.free = new FreeRecognizer(srLang(), onPartial);
@@ -1971,6 +1986,10 @@ const Rec = {
       this.t0 = now();
     }
     this.active = true;
+  },
+  frame(db) {
+    this.frames.push(db);
+    if (db > VOICE_DB) { this.voiced++; this.lastVoice = now(); }
   },
   async stop() {
     const durationMs = now() - this.t0;
@@ -2579,11 +2598,26 @@ const App = {
     if (P.kind === 'webspeech') Island.caption('');
     Sound.play('start');
     clearInterval(this.timer);
+    clearInterval(this.silenceT); this.silenceT = setInterval(() => this.checkSilence(), 250);
     if (this.pendingStop) { this.pendingStop = false; this.cancel(true); return; }
     /* Mini-fenêtre : ouverte une fois le micro allumé, encore dans le geste
        qui a lancé la dictée (Chrome laisse environ 5 s). Sinon, tant pis :
        le bouton « Mini-fenêtre » de la page l'ouvre à la main. */
     if (Settings.d.floating && Float.supported && !Float.win) Float.open();
+  },
+
+  /* Arrêt automatique (v0.4.6) : sans voix pendant le délai choisi, Verbe s'arrête et libère le micro.
+     S'il a entendu quelqu'un, il transcrit et colle comme d'habitude ; sinon il n'envoie rien. */
+  checkSilence() {
+    if (this.state !== 'recording' || !Rec.active) { clearInterval(this.silenceT); return; }
+    const sec = Number(Settings.d.autoStop) || 0;
+    if (!sec || now() - Rec.lastVoice < sec * 1000) return;
+    clearInterval(this.silenceT);
+    const delai = sec >= 60 ? `${sec / 60} min` : `${sec} s`;
+    if (Rec.voiced >= VOICE_FRAMES) { this.stop(); return; }
+    Rec.cancel(); Island.source = null; this.setState('idle');
+    Island.show('warn', { text: 'Je n’ai rien entendu.', hint: `Micro libéré après ${delai} sans voix.`, autoHide: 4200 });
+    Sound.play('error');
   },
 
   blocked(text, hint, action = 'settings') {
@@ -3064,7 +3098,7 @@ const UI = {
         if (q.kind !== 'limits') return [P.name, false];
         return [`${P.name} · ${q.empty ? 'limite atteinte' : q.tiny}`, q.low];
       })(),
-      micro: [Mics.name(d.micId), false],
+      micro: [Number(d.autoStop) ? `${Mics.name(d.micId)} · arrêt après ${Number(d.autoStop) >= 60 ? '1 min' : d.autoStop + ' s'}` : Mics.name(d.micId), false],
       raccourci: [this.scLabel().join(' '), false],
       texte: [txt.length ? txt.join(' · ') : 'Texte brut', false],
       bulle: [`${style} · ${pos}`, false],
@@ -3499,7 +3533,7 @@ function init() {
   loadHistory();
   Mics.refresh().then(() => { UI.renderMics(); UI.renderChips(); });
   if (Desktop) wireDesktop();
-  window.Verbe = { App, Island, Settings, Store, Float, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
+  window.Verbe = { App, Island, Settings, Store, Float, Rec, applyVoiceCommands, polishText, toAccel, splitAtSilences, encodeWav, analyzeSpeech, cleanTranscript }; /* pour les tests */
 }
 init();
 }

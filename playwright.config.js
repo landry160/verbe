@@ -10,16 +10,22 @@ const { defineConfig } = require('@playwright/test');
 
 const PORT = Number(process.env.VERBE_PORT || 4173);
 
-// La « voix » du faux micro : 3 s d'un son continu (440 Hz), rejouées en boucle.
-// Les bips du faux micro par défaut sont trop courts pour la détection de voix de Verbe (160 ms au moins) :
-// selon le moment, une dictée de test passait ou finissait sur « Aucune voix détectée ».
+// La « voix » du faux micro : des « syllabes » (250 ms de son, 120 ms de pause, hauteur qui change),
+// rejouées en boucle. Les bips du faux micro par défaut sont trop courts pour la détection de voix de
+// Verbe (160 ms au moins), et un son continu est effacé par l'anti-bruit de Chrome au bout d'une seconde.
 function voixDeTest() {
-  const fichier = path.join(os.tmpdir(), 'verbe-voix-de-test-440hz.wav');
+  const fichier = path.join(os.tmpdir(), 'verbe-voix-de-test-syllabes.wav');
   if (fs.existsSync(fichier)) return fichier;
   const taux = 16000;
   const n = taux * 3;
   const son = Buffer.alloc(n * 2);
-  for (let i = 0; i < n; i++) son.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / taux) * 0.3 * 32767), i * 2);
+  const hauteurs = [220, 330, 440, 550, 300, 410];
+  const syllabe = 0.25 * taux, pause = 0.12 * taux, fondu = 0.01 * taux;
+  for (let i = 0; i < n; i++) {
+    const k = Math.floor(i / (syllabe + pause)), t = i % (syllabe + pause);
+    const enveloppe = t >= syllabe ? 0 : Math.min(1, t / fondu, (syllabe - t) / fondu);
+    son.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hauteurs[k % hauteurs.length] * i) / taux) * 0.3 * enveloppe * 32767), i * 2);
+  }
   const entete = Buffer.alloc(44);
   entete.write('RIFF', 0);
   entete.writeUInt32LE(36 + son.length, 4);
