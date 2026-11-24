@@ -51,6 +51,18 @@ en ligne de part et d’autre du micro, position en bas par défaut, sons, aper�
 « point d'interrogation », « point d'exclamation », « point-virgule »,
 « ouvrez les guillemets » / « fermez les guillemets », « efface ça » (retire la phrase d'avant).
 
+## Tes progrès (en haut de l'Historique)
+
+Une ligne discrète : les mots dictés cette semaine (à partir du lundi) et au total, le temps gagné estimé
+et, à partir de 3 jours, la série de jours de suite. Rien ne s'affiche avant la première dictée réussie.
+- Temps gagné = les mots tapés au clavier à **40 mots par minute**, moins le temps réellement passé à parler.
+  Un clic (ou un toucher) sur la ligne montre ce calcul.
+- Seule une dictée au micro réussie compte, une seule fois : ni un échec, ni « Nettoyer », ni « Retranscrire »,
+  ni un fichier transcrit.
+- Le compteur est gardé à part (`verbe.stats` dans le stockage local), car l'historique ne garde que 100 dictées ;
+  « Vider l'historique » ne le remet pas à zéro. La première fois, il part des dictées déjà dans l'historique.
+- Bureau : la bulle compte la dictée, la fenêtre principale se met à jour aussitôt.
+
 ## Ce qu'il te reste (limites du service)
 
 Groq, forfait gratuit, Whisper (vérifié le 23 nov. 2026 sur console.groq.com/docs/rate-limits) :
@@ -94,11 +106,12 @@ npm run test:bureau               # l'app Electron (Windows)
 ```
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
-  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », mise en page sans défilement,
-  silences coupés avant l'envoi.
+  « Nettoyer », Réglages (ordinateur et téléphone), « Ce qu'il te reste », progrès de l'Historique,
+  mise en page sans défilement, silences coupés avant l'envoi.
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
-  presse-papiers rendu après le collage, mises à jour (nouvelle version, à jour, interrupteur coupé, version de
-  développement) avec un serveur local et un faux installateur, jamais lancé.
+  presse-papiers rendu après le collage, progrès à jour dans la fenêtre principale après une dictée de la bulle,
+  mises à jour (nouvelle version, à jour, interrupteur coupé, version de développement) avec un serveur local
+  et un faux installateur, jamais lancé.
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.
   Le micro est un faux micro de Chromium qui joue un son continu.
 - Rien de personnel n'est touché : la version bureau tourne dans un profil à part (`--profil=`),
