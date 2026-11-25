@@ -2257,14 +2257,23 @@ var Island = {
 		this.setPos(Settings.d.islandPos);
 		if (IS_BUBBLE) {
 			this.root.classList.add("bulle", "pip");
-			let over = false;
-			window.addEventListener("mousemove", (e) => {
-				const hit = !!e.target.closest?.(".isl");
-				if (hit !== over) {
-					over = hit;
-					Desktop.mouse(hit);
+			let last = "";
+			this.tellPill = () => {
+				const r = this.shell.getBoundingClientRect();
+				const box = this.root.hidden || !r.width || !r.height ? null : {
+					x: Math.round(r.left),
+					y: Math.round(r.top),
+					w: Math.round(r.width),
+					h: Math.round(r.height)
+				};
+				const k = JSON.stringify(box);
+				if (k !== last) {
+					last = k;
+					Desktop.pill?.(box);
 				}
-			});
+			};
+			new ResizeObserver(() => this.tellPill()).observe(this.shell);
+			new ResizeObserver(() => this.tellPill()).observe(document.documentElement);
 		}
 	},
 	setPos(p) {
@@ -2394,7 +2403,12 @@ var Island = {
 		this.win.requestAnimationFrame(() => {
 			R.classList.add("on");
 			this.dirty = true;
+			this.tellPill?.();
 		});
+		if (IS_BUBBLE) {
+			clearTimeout(this.pillT);
+			this.pillT = setTimeout(() => this.tellPill?.(), 450);
+		}
 		this.loop();
 		if (data.autoHide) this.hideTimer = setTimeout(() => this.hide(), data.autoHide);
 	},
@@ -2425,7 +2439,10 @@ var Island = {
 			if (this.state !== "hidden") return;
 			this.root.hidden = true;
 			this.root.dataset.state = "hidden";
-			if (IS_BUBBLE) Desktop.bubble(false);
+			if (IS_BUBBLE) {
+				this.tellPill?.();
+				Desktop.bubble(false);
+			}
 		}, 320);
 	},
 	setRight(txt) {
@@ -4812,9 +4829,16 @@ function wireUpdates() {
 	$("#maj-verifier").addEventListener("click", () => Desktop.checkUpdate().then(render));
 	$("#maj-redemarrer").addEventListener("click", () => Desktop.installUpdate());
 }
-var VERSION = "0.6.3";
+var VERSION = "0.6.4";
 var pourIci = (n) => Desktop ? !n.web : !n.desk;
 var NOUVEAUTES = [
+	{
+		v: "0.6.4",
+		icon: "circleCheck",
+		desk: true,
+		title: "La bulle ne bloque plus",
+		text: "Le bouton Terminer de la bulle répond toujours, même après un gel de l’ordi. Pendant l’écoute, l’icône près de l’horloge propose aussi Terminer et Annuler."
+	},
 	{
 		v: "0.6.3",
 		icon: "clock",

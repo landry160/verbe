@@ -51,6 +51,10 @@ Groq ou OpenAI. L'app Windows n'en a pas besoin : ni service, ni bouton « Insta
 2. La première fois, colle ta clé Groq dans **Réglages › Transcription**.
 3. Dans n'importe quelle app : **Ctrl + Maj + L**, parle, **Ctrl + Maj + L**. Le texte arrive là où était ton curseur.
 4. **Échap** annule pendant l'écoute. Fermer la fenêtre range Verbe près de l'horloge ; « Quitter Verbe » dans son menu l'arrête.
+   Pendant l'écoute, ce menu propose aussi **Terminer la dictée** et **Annuler la dictée** : une sortie
+   qui ne dépend pas de la bulle. La bulle ne surveille pas la souris de Windows (depuis la 0.6.4) :
+   l'app regarde où est le curseur et ne prend les clics que sur la pastille. Une bulle plantée est refaite
+   à neuf (micro libéré, Échap rendu à Windows).
 5. **Mises à jour** : quelques secondes après son démarrage, puis toutes les 6 h, Verbe regarde s'il y a une nouvelle version,
    la télécharge en arrière-plan et l'installe quand tu le quittes. « Redémarrer maintenant » (Réglages › Général, ou le menu
    de l'icône près de l'horloge) l'installe tout de suite. L'interrupteur « Mises à jour automatiques » (actif par défaut) et
@@ -207,6 +211,8 @@ npm run test:bureau               # l'app Electron (Windows)
   à jour, interrupteur coupé, version de développement) avec un serveur local et un faux installateur, jamais lancé.
   `raccourcis.spec.js` : Recoller, Réécrire (sélection, consigne,
   collage, presse-papiers rendu, rien de sélectionné, Échap, sans clé), doublons refusés, raccourci pris par une autre app.
+  `bulle-souris.spec.js` : aucun crochet sur la souris, clics pris seulement sur la pastille (curseur simulé),
+  « Terminer » et « Annuler » dans le menu de l'icône pendant l'écoute, bulle plantée refaite (Échap rendu).
   Il lance l'app avec `--essai-clavier` : touches, presse-papiers et raccourcis globaux sont des faux en mémoire,
   le micro est le faux micro de Chromium et Groq est simulé dans l'app (`protocol.handle`).
 - Groq est simulé : aucun appel réel, et une requête inattendue vers Internet fait échouer le test.

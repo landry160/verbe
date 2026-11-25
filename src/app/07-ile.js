@@ -39,12 +39,17 @@ const Island = {
     this.setPos(Settings.d.islandPos);
     if (IS_BUBBLE) {
       this.root.classList.add('bulle', 'pip'); /* même mise en page que la mini-fenêtre */
-      /* la fenêtre laisse passer les clics, sauf sur le micro et l'étiquette */
-      let over = false;
-      window.addEventListener('mousemove', e => {
-        const hit = !!e.target.closest?.('.isl');
-        if (hit !== over) { over = hit; Desktop.mouse(hit); }
-      });
+      /* la fenêtre laisse passer les clics, sauf sur la pastille : la page dit où elle est, l'app regarde
+         où est le curseur (v0.6.4 : plus de suivi de la souris de Windows, qui sautait quand l'ordi gelait) */
+      let last = '';
+      this.tellPill = () => {
+        const r = this.shell.getBoundingClientRect();
+        const box = this.root.hidden || !r.width || !r.height ? null : { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+        const k = JSON.stringify(box);
+        if (k !== last) { last = k; Desktop.pill?.(box); }
+      };
+      new ResizeObserver(() => this.tellPill()).observe(this.shell);
+      new ResizeObserver(() => this.tellPill()).observe(document.documentElement);
     }
   },
   setPos(p) { this.root.dataset.pos = p; },
@@ -147,7 +152,8 @@ const Island = {
       if ((state === 'error' || state === 'warn') && !data.autoHide) data.autoHide = 6500;
     }
     this.place();
-    this.win.requestAnimationFrame(() => { R.classList.add('on'); this.dirty = true; });
+    this.win.requestAnimationFrame(() => { R.classList.add('on'); this.dirty = true; this.tellPill?.(); });
+    if (IS_BUBBLE) { clearTimeout(this.pillT); this.pillT = setTimeout(() => this.tellPill?.(), 450); } /* après l'animation d'entrée */
     this.loop();
     if (data.autoHide) this.hideTimer = setTimeout(() => this.hide(), data.autoHide);
   },
@@ -178,7 +184,7 @@ const Island = {
     this.offTimer = setTimeout(() => {
       if (this.state !== 'hidden') return;
       this.root.hidden = true; this.root.dataset.state = 'hidden';
-      if (IS_BUBBLE) Desktop.bubble(false);
+      if (IS_BUBBLE) { this.tellPill?.(); Desktop.bubble(false); }
     }, 320);
   },
   setRight(txt) { if (this.r.textContent !== txt) this.r.textContent = txt; },

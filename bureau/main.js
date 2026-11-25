@@ -233,9 +233,55 @@ function createBubble() {
   });
   bubble.setAlwaysOnTop(true, 'screen-saver');
   bubble.setVisibleOnAllWorkspaces(true);
-  bubble.setIgnoreMouseEvents(true, { forward: true });
+  mouseIn = false;
+  bubble.setIgnoreMouseEvents(true);
   charger(bubble, { bulle: '1' });
+  /* une bulle plantée ou figée ne doit jamais garder le micro, Échap ou l'écran : on la refait à neuf */
+  bubble.webContents.on('render-process-gone', () => recoverBubble());
+  bubble.on('unresponsive', () => { clearTimeout(figee); figee = setTimeout(recoverBubble, BULLE_FIGEE); });
+  bubble.on('responsive', () => clearTimeout(figee));
 }
+/* La bulle s'est arrêtée (plantage) ou ne répond plus depuis 10 s de plus que le délai de Chromium :
+   la dictée en cours est perdue, mais tout redevient utilisable (micro libéré, Échap rendu à Windows). */
+const BULLE_FIGEE = 10000;
+let figee = 0;
+function recoverBubble() {
+  clearTimeout(figee);
+  watchMouse(false);
+  const old = bubble;
+  bubble = null; pill = null;
+  bubbleState = 'idle'; syncEscape(); updateTray();
+  if (main && !main.isDestroyed()) main.webContents.send('verbe:state', 'idle');
+  try { if (old && !old.isDestroyed()) old.destroy(); } catch (e) { /* déjà fermée */ }
+  if (!quitting) { createBubble(); recoveries++; }
+}
+let recoveries = 0;
+
+/* ---------- La bulle laisse passer les clics, sauf sur la pastille ----------
+   Avant la 0.6.4, Electron suivait la souris par un crochet système (setIgnoreMouseEvents « forward ») :
+   si l'ordi gelait une seconde (carte graphique, gros presse-papiers), Windows retirait ce crochet sans
+   prévenir, et la bulle ne recevait plus aucun clic (« Terminer » ne répondait plus, vu les 24 et 25 nov.).
+   Maintenant la page dit où est la pastille, et l'app regarde elle-même où est le curseur,
+   20 fois par seconde, seulement quand la bulle est visible. Rien n'est posé sur la souris de Windows. */
+let pill = null, mouseIn = false, mouseT = 0;
+const cursor = () => (global.verbeCurseur ? global.verbeCurseur() : screen.getCursorScreenPoint());
+function setMouseIn(v) {
+  if (v === mouseIn || !bubble || bubble.isDestroyed()) return;
+  mouseIn = v;
+  bubble.setIgnoreMouseEvents(!v);
+}
+function mouseTick() {
+  if (!bubble || bubble.isDestroyed() || !bubble.isVisible() || !pill) return setMouseIn(false);
+  const c = cursor(), b = bubble.getBounds(), m = 4;
+  const x = c.x - b.x, y = c.y - b.y;
+  setMouseIn(x >= pill.x - m && x <= pill.x + pill.w + m && y >= pill.y - m && y <= pill.y + pill.h + m);
+}
+function watchMouse(on) {
+  clearInterval(mouseT); mouseT = 0;
+  if (on) mouseT = setInterval(mouseTick, 50);
+  else setMouseIn(false);
+}
+global.verbeSouris = { etat: () => ({ pill, mouseIn, suivi: !!mouseT, recoveries }), tick: () => mouseTick(), recover: () => recoverBubble() }; /* pour les tests */
 
 function placeBubble(pos) {
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -287,8 +333,14 @@ function prettyAccel() { return (accel || '').replace('Control', 'Ctrl').replace
 function updateTray() {
   if (!tray) return;
   tray.setToolTip(accel ? `Verbe — ${prettyAccel()} pour dicter` : 'Verbe');
+  /* pendant l'écoute, une sortie qui ne dépend ni de la bulle ni de la souris sur elle */
+  const ecoute = bubbleState === 'recording' || bubbleState === 'starting';
+  const dicter = ecoute
+    ? [{ label: accel ? `Terminer la dictée    ${prettyAccel()}` : 'Terminer la dictée', click: toggleDictation },
+      { label: 'Annuler la dictée    Échap', click: () => bubble?.webContents.send('verbe:cancel') }]
+    : [{ label: accel ? `Dicter    ${prettyAccel()}` : 'Dicter', click: toggleDictation }];
   tray.setContextMenu(trayMenu = Menu.buildFromTemplate([
-    { label: accel ? `Dicter    ${prettyAccel()}` : 'Dicter', click: toggleDictation },
+    ...dicter,
     { label: 'Ouvrir Verbe', click: () => showMain() },
     { label: 'Historique', click: () => showMain('#historique') },
     { label: 'Réglages', click: () => showMain('#reglages') },
@@ -308,7 +360,12 @@ const others = sender => [main, bubble].filter(w => w && !w.isDestroyed() && w.w
 ipcMain.on('verbe:toggle', toggleDictation);
 ipcMain.on('verbe:cancel', () => bubble?.webContents.send('verbe:cancel'));
 ipcMain.on('verbe:levels', (e, d) => { if (main && !main.isDestroyed() && main.isVisible()) main.webContents.send('verbe:levels', d); });
-ipcMain.on('verbe:state', (e, s) => { bubbleState = s; syncEscape(); main?.webContents.send('verbe:state', s); });
+ipcMain.on('verbe:state', (e, s) => {
+  const ecoute = st => st === 'recording' || st === 'starting';
+  const changeMenu = ecoute(s) !== ecoute(bubbleState);
+  bubbleState = s; syncEscape(); main?.webContents.send('verbe:state', s);
+  if (changeMenu) updateTray(); /* « Terminer » et « Annuler » dans le menu de l'icône pendant l'écoute */
+});
 ipcMain.on('verbe:notify', (e, kind) => { if (kind === 'history' || kind === 'settings') for (const w of others(e.sender)) w.webContents.send('verbe:' + kind); });
 let placedPos = null;
 ipcMain.on('verbe:bubble', (e, v) => {
@@ -318,12 +375,14 @@ ipcMain.on('verbe:bubble', (e, v) => {
     /* placée à chaque apparition (l'écran du curseur a pu changer), et déplacée
        tout de suite si on change la position pendant qu'elle est visible */
     if (!bubble.isVisible() || pos !== placedPos) { placeBubble(pos); placedPos = pos; }
-    if (!bubble.isVisible()) { bubble.setIgnoreMouseEvents(true, { forward: true }); bubble.showInactive(); }
+    if (!bubble.isVisible()) { mouseIn = false; bubble.setIgnoreMouseEvents(true); bubble.showInactive(); }
     bubble.setAlwaysOnTop(true, 'screen-saver');
-  } else bubble.hide();
+    if (!mouseT) watchMouse(true);
+  } else { watchMouse(false); bubble.hide(); }
 });
 ipcMain.on('verbe:preview', () => bubble?.webContents.send('verbe:preview'));
-ipcMain.on('verbe:mouse', (e, inside) => bubble?.setIgnoreMouseEvents(!inside, { forward: true }));
+/* où est la pastille dans la fenêtre de la bulle ({ x, y, w, h }), ou null quand elle est cachée */
+ipcMain.on('verbe:pill', (e, r) => { pill = r && ['x', 'y', 'w', 'h'].every(k => Number.isFinite(r[k])) && r.w > 0 && r.h > 0 ? { x: r.x, y: r.y, w: r.w, h: r.h } : null; });
 ipcMain.on('verbe:open-main', (e, hash) => showMain(hash));
 ipcMain.handle('verbe:copy', (e, text) => { saveClipboard(); clip.writeText(text); return true; });
 ipcMain.handle('verbe:paste', async (e, opts) => {

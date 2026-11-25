@@ -363,10 +363,11 @@ function wireUpdates() {
    Réglages › Général › « Nouveautés » la rouvre. À chaque version :
    monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
    ------------------------------------------------------------ */
-const VERSION = '0.6.3';
+const VERSION = '0.6.4';
 /* desk : seulement l'app Windows ; web : seulement la version web (téléphone, navigateur) */
 const pourIci = n => (Desktop ? !n.web : !n.desk);
 const NOUVEAUTES = [
+  { v: '0.6.4', icon: 'circleCheck', desk: true, title: 'La bulle ne bloque plus', text: 'Le bouton Terminer de la bulle répond toujours, même après un gel de l’ordi. Pendant l’écoute, l’icône près de l’horloge propose aussi Terminer et Annuler.' },
   { v: '0.6.3', icon: 'clock', title: 'Ce qu’il te reste, plus clair', text: 'Le temps de Groq ne revient pas d’un coup à minuit : chaque dictée te revient 24 h plus tard. Réglages › Transcription montre ce que tu as utilisé et quand ton temps revient.' },
   { v: '0.6.2', icon: 'download', web: true, title: 'Verbe s’installe sur ton téléphone', text: 'Réglages › Général › Installer : une icône sur l’écran d’accueil, Verbe en plein écran, et il s’ouvre même sans réseau.' },
   { v: '0.6.1', icon: 'history', desk: true, title: 'L’historique toujours à jour', text: 'Une dictée faite juste après l’ouverture de Verbe apparaît maintenant à coup sûr dans l’historique de la fenêtre.' },

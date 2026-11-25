@@ -13,7 +13,8 @@ contextBridge.exposeInMainWorld('verbeDesktop', {
   /* la position voyage avec la demande (« center », « top », « bottom ») ; false cache la bulle */
   bubble: pos => ipcRenderer.send('verbe:bubble', pos ? String(pos) : false),
   preview: () => ipcRenderer.send('verbe:preview'),
-  mouse: inside => ipcRenderer.send('verbe:mouse', !!inside),
+  /* où est la pastille dans la bulle ({ x, y, w, h }, ou null) : l'app ne laisse passer les clics que là */
+  pill: r => ipcRenderer.send('verbe:pill', r ? { x: +r.x, y: +r.y, w: +r.w, h: +r.h } : null),
   openMain: hash => ipcRenderer.send('verbe:open-main', String(hash || '')),
   copy: text => ipcRenderer.invoke('verbe:copy', String(text)),
   paste: opts => ipcRenderer.invoke('verbe:paste', opts || {}),
