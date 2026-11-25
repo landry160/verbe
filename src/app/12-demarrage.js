@@ -11,8 +11,9 @@ function init() {
   Island.init();
   App.setState('idle');
   $('#app-version').textContent = VERSION;
+  installable();
   $('#btn-news').addEventListener('click', () => News.open());
-  $('#news-link').hidden = !NOUVEAUTES.some(n => n.v === VERSION && (Desktop || !n.desk)); /* rien de neuf ici : pas de lien */
+  $('#news-link').hidden = !NOUVEAUTES.some(n => n.v === VERSION && pourIci(n)); /* rien de neuf ici : pas de lien */
   const nouveau = News.pending();
   if (nouveau.length) setTimeout(() => News.open(nouveau), 600); /* après l'ouverture : la page se pose d'abord */
   UI.renderShortcut();
@@ -33,6 +34,34 @@ function init() {
   Object.assign(window.Verbe, { fixWords, wordsPrompt, wholeSnippet, insertSnippets }); /* Mes mots, pour les tests */
   Object.assign(window.Verbe, { appCategory, llmPlan, llmPrompt }); /* traduction et ton selon l'app (tests) */
   Object.assign(window.Verbe, { UI, rewriteText, REWRITE_PROMPT }); /* raccourcis Recoller et Réécrire (tests) */
+}
+
+/* App web installable (v0.6.2) : le service gardé hors connexion, et « Installer Verbe » dans Réglages › Général.
+   Jamais dans l'app bureau (elle est déjà installée). */
+function installable() {
+  if (Desktop) return;
+  const web = location.protocol === 'https:' || location.hostname === 'localhost';
+  if (web && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn('[Verbe] hors connexion indisponible', e));
+  const dejaInstalle = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (dejaInstalle) return;
+  const ligne = $('#install-row'), bouton = $('#btn-install'), aide = $('#install-help');
+  let invite = null;
+  /* Chrome et Edge (Android, ordi) : le navigateur propose l'installation, on la garde pour le bouton */
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); invite = e; bouton.hidden = false; ligne.hidden = false; });
+  window.addEventListener('appinstalled', () => { ligne.hidden = true; Toast.show({ type: 'ok', text: 'Verbe est installé.', sub: 'Son icône est sur ton écran d’accueil.' }); });
+  bouton.addEventListener('click', async () => {
+    if (!invite) return;
+    invite.prompt();
+    const choix = await invite.userChoice.catch(() => null);
+    if (choix && choix.outcome === 'accepted') ligne.hidden = true;
+    invite = null;
+  });
+  /* iPhone et iPad (Safari) : pas d'invite, on dit le geste */
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    bouton.hidden = true;
+    aide.textContent = 'Dans Safari : touche Partager, puis « Sur l’écran d’accueil ». Verbe aura son icône et s’ouvrira en plein écran.';
+    ligne.hidden = false;
+  }
 }
 
 init();

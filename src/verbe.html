@@ -7,6 +7,11 @@
 <meta name="description" content="Verbe — dictée vocale : parle, c’est écrit et copié.">
 <title>Verbe — dictée vocale</title>
 <link rel="icon" id="favicon" href="data:,">
+<!-- app web installable (téléphone, ordi) : nom, icônes, ouverture en plein écran -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Verbe">
 <script>
 /* Thème appliqué avant le premier rendu (design-cuivre B10) */
 (function () {
@@ -370,6 +375,10 @@
                 </div>
               </div>
             </div>
+            <div class="srow web-only" id="install-row" hidden>
+              <div class="srow-t"><span class="flabel">Installer Verbe sur cet appareil</span><p class="help" id="install-help">Une icône sur l’écran d’accueil, Verbe en plein écran, même sans réseau.</p></div>
+              <div class="srow-c"><button class="btn btn-2 btn-sm" id="btn-install" type="button"><span data-icon="download" data-size="18"></span>Installer</button></div>
+            </div>
             <div class="srow desk-only">
               <div class="srow-t"><span class="flabel" id="login-label">Lancer Verbe avec Windows</span><p class="help">Le raccourci est prêt dès que tu allumes l’ordi.</p></div>
               <div class="srow-c"><button class="switch" type="button" role="switch" aria-labelledby="login-label" id="login-switch"></button></div>
@@ -395,7 +404,7 @@
               <div class="srow-c"><button class="btn btn-sm iconbtn danger" id="btn-clear" type="button"><span data-icon="trash" data-size="18"></span>Vider l’historique</button></div>
             </div>
           </div>
-          <p class="foot">Verbe v<span id="app-version">0.6.1</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
+          <p class="foot">Verbe v<span id="app-version">0.6.2</span><span id="news-link"> · <button type="button" id="btn-news">Nouveautés</button></span></p>
         </section>
 
       </div>

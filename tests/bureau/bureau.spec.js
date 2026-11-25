@@ -98,6 +98,10 @@ test('dans le bureau, Général dit « sur cet ordi » (pas « dans ce navigateu
   const texte = await pane.innerText();
   expect(texte).toContain('sur cet ordi');
   expect(texte).not.toContain('dans ce navigateur');
+  // l'app Windows est déjà installée : ni « Installer », ni service hors connexion
+  await expect(principale.locator('#install-row')).toBeHidden();
+  expect(texte).not.toContain('Installer Verbe');
+  expect(await principale.evaluate(async () => (navigator.serviceWorker ? (await navigator.serviceWorker.getRegistrations()).length : 0))).toBe(0);
 });
 
 test('des réglages abîmés (Ctrl + Maj + K, collage coupé) sont réparés une seule fois', async () => {

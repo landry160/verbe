@@ -363,8 +363,11 @@ function wireUpdates() {
    Réglages › Général › « Nouveautés » la rouvre. À chaque version :
    monter VERSION (comme package.json) et ajouter ses nouveautés en tête.
    ------------------------------------------------------------ */
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
+/* desk : seulement l'app Windows ; web : seulement la version web (téléphone, navigateur) */
+const pourIci = n => (Desktop ? !n.web : !n.desk);
 const NOUVEAUTES = [
+  { v: '0.6.2', icon: 'download', web: true, title: 'Verbe s’installe sur ton téléphone', text: 'Réglages › Général › Installer : une icône sur l’écran d’accueil, Verbe en plein écran, et il s’ouvre même sans réseau.' },
   { v: '0.6.1', icon: 'history', desk: true, title: 'L’historique toujours à jour', text: 'Une dictée faite juste après l’ouverture de Verbe apparaît maintenant à coup sûr dans l’historique de la fenêtre.' },
   { v: '0.6.0', icon: 'sparkles', title: 'Des transcriptions plus propres', text: 'Quand Whisper invente « Sous-titres réalisés par Amara.org » sur un silence, Verbe retire maintenant la phrase en entier.' },
   { v: '0.5.3', icon: 'mic', desk: true, title: 'La bulle descend', text: 'En bas, elle se pose juste au-dessus de la barre des tâches, plus loin de ce que tu écris.' },
@@ -380,7 +383,7 @@ const News = {
   seen() { try { return localStorage.getItem(this.key); } catch (e) { return VERSION; } },
   mark() { try { localStorage.setItem(this.key, VERSION); } catch (e) { /* stockage indisponible */ } },
   /* ce qui est nouveau depuis la version vue (dans la version web : seulement ce qui la concerne) */
-  since(after) { return NOUVEAUTES.filter(n => cmpVer(n.v, after) > 0 && cmpVer(n.v, VERSION) <= 0 && (Desktop || !n.desk)); },
+  since(after) { return NOUVEAUTES.filter(n => cmpVer(n.v, after) > 0 && cmpVer(n.v, VERSION) <= 0 && pourIci(n)); },
   /* ce qu'il faut montrer à ce démarrage ; décidé (et noté pour une nouvelle installation) tout de suite,
      pour qu'un Verbe fermé aussitôt ouvert ne prenne pas sa première visite pour une mise à jour */
   pending() {
@@ -391,7 +394,7 @@ const News = {
     if (!list.length) this.mark();
     return list;
   },
-  open(list = NOUVEAUTES.filter(n => n.v === VERSION && (Desktop || !n.desk))) {
+  open(list = NOUVEAUTES.filter(n => n.v === VERSION && pourIci(n))) {
     if (!list.length || $('#news')) return;
     let i = 0;
     const wrap = document.createElement('div');

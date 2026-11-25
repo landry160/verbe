@@ -28,6 +28,23 @@ Les deux versions partagent la même page (`app/verbe.html`), construite par Vit
 La version bureau ajoute seulement `bureau/` : la fenêtre, la bulle, le raccourci global, le collage
 et la lecture des compteurs de limite.
 
+## Sur le téléphone (version web installée)
+
+La version web s'installe comme une app : une icône sur l'écran d'accueil, Verbe en plein écran,
+et il s'ouvre même sans réseau (la transcription, elle, a besoin d'Internet).
+
+- **Android (Chrome)** : ouvrir https://landry160.github.io/verbe/, puis Réglages › Général › **Installer**
+  (ou le menu ⋮ › « Installer l'application »).
+- **iPhone (Safari)** : ouvrir la même adresse, touche **Partager**, puis **« Sur l'écran d'accueil »**.
+  Réglages › Général le rappelle.
+
+La clé Groq se colle une fois dans l'app installée (elle a son propre stockage). L'écoute s'arrête si l'écran
+se verrouille : pour une longue réunion, enregistrer avec le dictaphone du téléphone, puis « Importer un fichier ».
+
+Les fichiers de l'app installable sont dans `public/` (`manifest.webmanifest`, `sw.js`, `icons/`), copiés dans `app/`
+par Vite. Le service hors connexion (`sw.js`) prend toujours le réseau d'abord et ne touche jamais aux appels vers
+Groq ou OpenAI. L'app Windows n'en a pas besoin : ni service, ni bouton « Installer ».
+
 ## Utiliser la version bureau
 
 1. Double-clique **Verbe** sur le Bureau. L'icône cuivre apparaît près de l'horloge.
@@ -180,7 +197,8 @@ npm run test:bureau               # l'app Electron (Windows)
 
 - **Web** (`tests/web`) : dictée au raccourci et au micro flottant, Échap, commandes à la voix,
   « Nettoyer », mes mots et textes tout prêts, « Coller en » (traduction), Réglages (ordinateur et téléphone), « Ce qu'il te reste », progrès de l'Historique,
-  mise en page sans défilement, silences coupés avant l'envoi.
+  mise en page sans défilement, silences coupés avant l'envoi, app installable (fiche et icônes, ouverture sans réseau,
+  bouton « Installer », marche à suivre sur iPhone, Nouveautés propres au web).
 - **Bureau** (`tests/bureau`) : position et formes de la bulle, réparation des réglages, collage par SendInput,
   presse-papiers rendu après le collage, progrès à jour dans la fenêtre principale après une dictée de la bulle,
   ton selon l'app (catégorie des programmes, consigne envoyée au modèle simulé), mises à jour (nouvelle version,
@@ -200,8 +218,10 @@ npm run test:bureau               # l'app Electron (Windows)
 
 1. Monter la version dans `package.json` et dans `VERSION` (`app/verbe.html`, un test vérifie qu'elles sont pareilles),
    puis ajouter ses nouveautés en tête de `NOUVEAUTES` (icône, titre, une phrase ; `desk: true` si elle ne concerne
-   que Windows). Après la mise à jour, Verbe les présente une fois dans la fenêtre des Nouveautés ;
-   Réglages › Général › « Nouveautés » la rouvre.
+   que Windows, `web: true` si elle ne concerne que la version web). Après la mise à jour, Verbe les présente une fois
+   dans la fenêtre des Nouveautés ; Réglages › Général › « Nouveautés » la rouvre.
+   **Une version qui ne change que le web** (comme la 0.6.2) : pousser sur `main` suffit (GitHub Pages) ; sans étiquette,
+   l'app Windows ne télécharge pas une mise à jour qui ne lui apporte rien.
 2. **Automatique** : créer puis pousser l'étiquette `v<version>` (par exemple `v0.4.7`).
    `.github/workflows/release.yml` construit alors l'installateur sous Windows et publie la version GitHub avec les trois fichiers.
 3. **À la main**, si besoin : `npm run installateur`, puis créer une version (« Release ») sur GitHub avec l'étiquette

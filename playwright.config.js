@@ -61,6 +61,7 @@ const web = {
     locale: 'fr-CA',
     timezoneId: 'America/Toronto',
     permissions: ['microphone'],
+    serviceWorkers: 'block', // le service hors connexion ne s'en mêle pas (tests/web/installable.spec.js l'autorise)
     launchOptions: {
       args: [
         '--use-fake-ui-for-media-stream',

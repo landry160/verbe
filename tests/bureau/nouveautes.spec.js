@@ -60,10 +60,16 @@ test('une nouvelle installation n’affiche pas de nouveautés', async () => {
 const depuis = v => principale.evaluate(x => window.Verbe.News.since(x).map(n => n.title), v);
 
 test('après une mise à jour : une nouveauté par page, puis plus jamais pour cette version', async () => {
-  const attendus = await principale.evaluate(() => window.Verbe.NOUVEAUTES.filter(n => n.v === window.Verbe.VERSION).map(n => n.title));
-  expect(attendus.length, 'la version a ses nouveautés').toBeGreaterThan(0);
-  const avant = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v !== window.Verbe.VERSION)?.v || '0.5.0');
+  const attendus = await principale.evaluate(() => window.Verbe.NOUVEAUTES.filter(n => n.v === window.Verbe.VERSION && !n.web).map(n => n.title));
+  const avant = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v !== window.Verbe.VERSION && !n.web)?.v || '0.5.0');
   await relancer(avant);
+  if (!attendus.length) {
+    // une version propre à la version web (0.6.2 : l'app installable) : rien de neuf à présenter sur Windows
+    await principale.waitForTimeout(1200);
+    expect((await fenetre()).ouverte, 'pas de fenêtre pour une version sans nouveauté Windows').toBe(false);
+    expect(await principale.evaluate(() => localStorage.getItem('verbe.nouveautes'))).toBe(VERSION);
+    return;
+  }
   await expect.poll(async () => (await fenetre()).ouverte).toBe(true);
   for (let i = 0; i < attendus.length; i++) {
     const f = await fenetre();
@@ -92,8 +98,14 @@ test('venant d’une version qui ne notait rien (0.5.1) : les nouveautés depuis
 });
 
 test('Réglages › Général › « Nouveautés » rouvre la fenêtre', async () => {
-  const premier = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v === window.Verbe.VERSION).title);
+  const premier = await principale.evaluate(() => window.Verbe.NOUVEAUTES.find(n => n.v === window.Verbe.VERSION && !n.web)?.title);
   await principale.evaluate(() => { location.hash = '#reglages/general'; });
+  if (!premier) {
+    // rien de neuf sur Windows dans cette version : pas de lien vers une fenêtre vide
+    await expect(principale.locator('#app-version')).toBeVisible();
+    await expect(principale.locator('#news-link')).toBeHidden();
+    return;
+  }
   await expect(principale.locator('#btn-news')).toBeVisible();
   await principale.click('#btn-news');
   await expect.poll(async () => (await fenetre()).titre).toBe(premier);
