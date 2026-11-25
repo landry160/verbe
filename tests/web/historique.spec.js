@@ -1,6 +1,20 @@
 // Historique : deux lectures qui se croisent ne remettent jamais une liste périmée.
 const { test, expect, ouvrir } = require('./aides');
 
+test('une dictée finie avant que l’historique soit ouvert est quand même gardée (premier démarrage lent)', async ({ page }) => {
+  await ouvrir(page);
+  const textes = await page.evaluate(async () => {
+    const { App, Store } = window.Verbe;
+    Store.db = null; Store.opening = null; // comme au tout premier démarrage : la base n'est pas encore ouverte
+    const item = App.newItem({ source: 'micro', durationMs: 1000 });
+    await App.finish(item, 'Gardée malgré tout.', performance.now());
+    return (await Store.all()).map(i => i.text);
+  });
+  expect(textes).toContain('Gardée malgré tout.');
+  await page.evaluate(() => { location.hash = '#historique'; });
+  await expect(page.locator('#h-list')).toContainText('Gardée malgré tout.');
+});
+
 test('une lecture lente de l’historique ne remet pas une liste périmée (dictée arrivée pendant la lecture)', async ({ page }) => {
   await ouvrir(page);
   const ids = await page.evaluate(async () => {

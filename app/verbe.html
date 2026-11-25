@@ -1013,8 +1013,10 @@ var Store = {
 	db: null,
 	mem: null,
 	memAudio: null,
+	opening: null,
 	open() {
-		return new Promise((res, rej) => {
+		if (this.opening) return this.opening;
+		return this.opening = new Promise((res, rej) => {
 			let req;
 			try {
 				req = indexedDB.open("verbe", 1);
@@ -1033,17 +1035,25 @@ var Store = {
 			};
 			req.onerror = () => rej(req.error);
 			req.onblocked = () => rej(/* @__PURE__ */ new Error("blocked"));
+		}).catch((e) => {
+			this.opening = null;
+			throw e;
 		});
+	},
+	async ready() {
+		if (!this.db && !this.mem) await this.open();
 	},
 	useMemory() {
 		this.mem = /* @__PURE__ */ new Map();
 		this.memAudio = /* @__PURE__ */ new Map();
 	},
 	async all() {
+		await this.ready();
 		if (this.mem) return [...this.mem.values()].sort((a, b) => b.createdAt - a.createdAt);
 		return (await reqP(this.db.transaction("items").objectStore("items").getAll())).sort((a, b) => b.createdAt - a.createdAt);
 	},
 	async put(item) {
+		await this.ready();
 		if (this.mem) {
 			this.mem.set(item.id, { ...item });
 			return;
@@ -1053,6 +1063,7 @@ var Store = {
 		await txDone(t);
 	},
 	async putAudio(id, blob) {
+		await this.ready();
 		if (this.mem) {
 			this.memAudio.set(id, blob);
 			return;
@@ -1062,10 +1073,12 @@ var Store = {
 		await txDone(t);
 	},
 	async getAudio(id) {
+		await this.ready();
 		if (this.mem) return this.memAudio.get(id) || null;
 		return await reqP(this.db.transaction("audio").objectStore("audio").get(id)) || null;
 	},
 	async delAudio(id) {
+		await this.ready();
 		if (this.mem) {
 			this.memAudio.delete(id);
 			return;
@@ -1075,6 +1088,7 @@ var Store = {
 		await txDone(t);
 	},
 	async del(id) {
+		await this.ready();
 		if (this.mem) {
 			this.mem.delete(id);
 			this.memAudio.delete(id);
@@ -1086,6 +1100,7 @@ var Store = {
 		await txDone(t);
 	},
 	async clear() {
+		await this.ready();
 		if (this.mem) {
 			this.mem.clear();
 			this.memAudio.clear();
