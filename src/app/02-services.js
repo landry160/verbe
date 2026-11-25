@@ -81,6 +81,12 @@ const Quota = {
     for (const [t, p, s] of this.read('verbe.usage', [])) if (p === pid && now - t < win) { req++; sec += s; }
     return { req, sec };
   },
+  /* la limite glisse sur 24 h : chaque envoi revient 24 h après. Le plus ancien encore compté revient le premier. */
+  next(pid) {
+    const now = Date.now(); let first = null;
+    for (const e of this.read('verbe.usage', [])) if (e[1] === pid && now - e[0] < DAY_MS && (!first || e[0] < first[0])) first = e;
+    return first && { at: first[0] + DAY_MS, sec: first[2] };
+  },
   /* les compteurs officiels, quand la réponse les laisse lire */
   fromHeaders(pid, h) {
     const lim = Number(h.get('x-ratelimit-limit-requests')), rem = h.get('x-ratelimit-remaining-requests');
@@ -105,7 +111,7 @@ const Quota = {
     const byAudio = audio.left / audio.limit <= req.left / req.limit;
     const short = byAudio ? `${fmtAudio(audio.left)} d’audio` : `${nf0.format(req.left)} requêtes`;
     const tiny = byAudio ? `${fmtAudio(audio.left)} restantes` : `${nf0.format(req.left)} requêtes`; /* pour la colonne des sections */
-    return { kind: 'limits', plan, req, audio, hourLeft, ash: lim.ash, api: fresh ? api : null, low: fr < 0.15, empty: fr <= 0, short, tiny, day };
+    return { kind: 'limits', plan, req, audio, hourLeft, ash: lim.ash, api: fresh ? api : null, low: fr < 0.15, empty: fr <= 0, short, tiny, day, next: this.next(pid) };
   },
 };
 const srLang = () => ({ fr: 'fr-CA', en: 'en-CA' }[Settings.d.lang] || navigator.language || 'fr-CA');

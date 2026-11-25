@@ -89,6 +89,13 @@ function relTime(ts) {
   if (dt.toDateString() === yest.toDateString()) return `hier, ${hh}`;
   return dt.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) + `, ${hh}`;
 }
+/* un moment à venir, dans les prochaines 24 h : « dans 14 min », « à 16 h 47 », « demain à 9 h 27 » */
+function fmtWhen(ts) {
+  const d = ts - Date.now();
+  if (d < 3600000) return `dans ${Math.max(1, Math.round(d / 60000))} min`;
+  const dt = new Date(ts), hh = `${dt.getHours()} h ${String(dt.getMinutes()).padStart(2, '0')}`;
+  return dt.toDateString() === new Date().toDateString() ? `à ${hh}` : `demain à ${hh}`;
+}
 const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 

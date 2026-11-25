@@ -431,6 +431,12 @@ function relTime(ts) {
 		year: dt.getFullYear() !== (/* @__PURE__ */ new Date()).getFullYear() ? "numeric" : void 0
 	}) + `, ${hh}`;
 }
+function fmtWhen(ts) {
+	const d = ts - Date.now();
+	if (d < 36e5) return `dans ${Math.max(1, Math.round(d / 6e4))} min`;
+	const dt = new Date(ts), hh = `${dt.getHours()} h ${String(dt.getMinutes()).padStart(2, "0")}`;
+	return dt.toDateString() === (/* @__PURE__ */ new Date()).toDateString() ? `à ${hh}` : `demain à ${hh}`;
+}
 var plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 var norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 function userError(code, text, hint = "") {
@@ -758,6 +764,15 @@ var Quota = {
 			sec
 		};
 	},
+	next(pid) {
+		const now = Date.now();
+		let first = null;
+		for (const e of this.read("verbe.usage", [])) if (e[1] === pid && now - e[0] < DAY_MS && (!first || e[0] < first[0])) first = e;
+		return first && {
+			at: first[0] + DAY_MS,
+			sec: first[2]
+		};
+	},
 	fromHeaders(pid, h) {
 		const lim = Number(h.get("x-ratelimit-limit-requests")), rem = h.get("x-ratelimit-remaining-requests");
 		if (!lim || rem == null) return;
@@ -814,7 +829,8 @@ var Quota = {
 			empty: fr <= 0,
 			short,
 			tiny,
-			day
+			day,
+			next: this.next(pid)
 		};
 	}
 };
@@ -3903,12 +3919,12 @@ var UI = {
 			return;
 		}
 		const plan = q.plan === "dev" ? "forfait Developer" : "forfait gratuit";
-		const reset = q.api && q.api.resetAt > Date.now() ? ` Remise à zéro des requêtes dans ${fmtWait(q.api.resetAt - Date.now())}.` : "";
-		src.textContent = q.api ? `Selon ${P.name} (${plan}), ${relTime(q.api.at)}. L’audio est compté par Verbe sur 24 h.${reset}` : `Estimé par Verbe : ce que cet appareil a envoyé sur les dernières 24 h, comparé au ${plan} de ${P.name}.${Desktop ? " Le compte exact arrive avec ta prochaine dictée." : ""}`;
+		src.textContent = (q.day.sec > 0 ? `Tu as utilisé ${fmtAudio(q.day.sec)} d’audio sur les dernières 24 h. Chaque dictée te revient 24 h plus tard, pas d’un coup à minuit.` : "Rien d’envoyé sur les dernières 24\xA0h\xA0: tout ton temps est là.") + (q.api ? ` Requêtes selon ${P.name} (${plan}), ${relTime(q.api.at)}.` : ` Estimé par Verbe, ${plan} de ${P.name}.`);
 		let html = "<div class=\"quota\">";
-		html += line(nf0.format(q.req.left), "requêtes", q.req.left, q.req.limit, `sur ${nf0.format(q.req.limit)} par jour`);
-		html += line(fmtAudio(q.audio.left), "d’audio", q.audio.left, q.audio.limit, `sur ${fmtAudio(q.audio.limit)} par jour`);
-		if (q.hourLeft < q.ash * .5) html += line(fmtAudio(q.hourLeft), "cette heure-ci", q.hourLeft, q.ash, `sur ${fmtAudio(q.ash)} par heure`);
+		html += line(fmtAudio(q.audio.left), "d’audio", q.audio.left, q.audio.limit, `sur ${fmtAudio(q.audio.limit)} en 24 h`);
+		html += line(nf0.format(q.req.left), "requêtes", q.req.left, q.req.limit, `sur ${nf0.format(q.req.limit)} en 24 h`);
+		if (q.hourLeft < q.ash * .5) html += line(fmtAudio(q.hourLeft), "cette heure-ci", q.hourLeft, q.ash, `sur ${fmtAudio(q.ash)} en 1 h`);
+		if (q.next) html += `<p class="qnext">${icon("clock", 16)}<span>Prochain retour : <b>+${fmtAudio(q.next.sec)}</b> ${fmtWhen(q.next.at)}</span></p>`;
 		body.innerHTML = html + "</div>";
 	},
 	renderRegNav() {
@@ -4796,9 +4812,15 @@ function wireUpdates() {
 	$("#maj-verifier").addEventListener("click", () => Desktop.checkUpdate().then(render));
 	$("#maj-redemarrer").addEventListener("click", () => Desktop.installUpdate());
 }
-var VERSION = "0.6.2";
+var VERSION = "0.6.3";
 var pourIci = (n) => Desktop ? !n.web : !n.desk;
 var NOUVEAUTES = [
+	{
+		v: "0.6.3",
+		icon: "clock",
+		title: "Ce qu’il te reste, plus clair",
+		text: "Le temps de Groq ne revient pas d’un coup à minuit : chaque dictée te revient 24 h plus tard. Réglages › Transcription montre ce que tu as utilisé et quand ton temps revient."
+	},
 	{
 		v: "0.6.2",
 		icon: "download",
@@ -5458,6 +5480,9 @@ body.maj-prete .reg-tab[data-sec="general"] .reg-ic::after { top: -3px; right: -
 .qline.low .qbar i { background: linear-gradient(135deg, #F5B33B 0%, #E07B00 100%); }
 .qline.empty .qbar i { background: var(--fill-danger); }
 .qline small { font: 600 13px/1.2 var(--font); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qnext { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 14px/1.3 var(--font); color: var(--muted); font-variant-numeric: tabular-nums; }
+.qnext .ic { flex: none; color: var(--primary-strong, var(--fg)); }
+.qnext b { color: var(--fg); font-weight: 800; }
 @media (max-width: 560px) { .qline { grid-template-columns: minmax(0, 1fr) auto; } .qline .qbar { grid-column: 1 / -1; grid-row: 2; } }
 .cmds { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 10px 0 2px; font-size: 14px; }
 .cmds dt { font-weight: 800; color: var(--fg); }

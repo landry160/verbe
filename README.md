@@ -134,6 +134,8 @@ Dans **Réglages › Texte**, deux listes : ajouter, modifier, retirer (une lign
 
 Groq, forfait gratuit, Whisper (vérifié le 23 nov. 2026 sur console.groq.com/docs/rate-limits) :
 2 000 requêtes par jour, 8 h d'audio par jour, 2 h d'audio par heure. Groq compte au moins 10 s par requête.
+Ces limites glissent : rien ne se remet à zéro à minuit, chaque envoi revient 24 h après. Depuis la 0.6.3,
+Verbe dit donc ce qui a été utilisé sur les dernières 24 h et quand le prochain morceau de temps revient.
 Groq renvoie les requêtes restantes dans chaque réponse, mais un navigateur ne peut pas les lire :
 l'app bureau les rend lisibles. Sinon, Verbe compte ce que l'appareil a envoyé sur 24 h.
 OpenAI et Mistral sont payés à l'usage : Verbe affiche l'audio envoyé et son coût estimé.

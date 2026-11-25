@@ -87,9 +87,18 @@ test('déjà installé (ouvert depuis l’icône) : plus rien sur l’installati
 test('de retour sur le site après la 0.6.0 : la fenêtre des Nouveautés annonce l’installation, et rien de propre à Windows', async ({ page }) => {
   await ouvrir(page, { avant: () => localStorage.setItem('verbe.nouveautes', '0.6.0') });
   await expect(page.locator('#news')).toBeVisible();
-  await expect(page.locator('#news-title')).toHaveText('Verbe s’installe sur ton téléphone');
-  await expect(page.locator('#news .news-dots i')).toHaveCount(1); // pas « L’historique toujours à jour » (0.6.1, Windows)
-  await page.locator('#news [data-n="next"]').click();
+  // toutes les nouveautés après la 0.6.0, sauf celles propres à Windows (« L’historique toujours à jour », 0.6.1)
+  const attendus = await page.evaluate(() => {
+    const plus = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+    return window.Verbe.NOUVEAUTES.filter(n => plus(n.v, '0.6.0') && !n.desk).map(n => n.title);
+  });
+  expect(attendus).toContain('Verbe s’installe sur ton téléphone');
+  expect(attendus).not.toContain('L’historique toujours à jour');
+  await expect(page.locator('#news .news-dots i')).toHaveCount(attendus.length);
+  for (const titre of attendus) {
+    await expect(page.locator('#news-title')).toHaveText(titre);
+    await page.locator('#news [data-n="next"]').click();
+  }
   await expect(page.locator('#news')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('verbe.nouveautes'))).toBe(await page.evaluate(() => window.Verbe.VERSION));
 });

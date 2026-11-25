@@ -282,14 +282,17 @@ const UI = {
       return;
     }
     const plan = q.plan === 'dev' ? 'forfait Developer' : 'forfait gratuit';
-    const reset = q.api && q.api.resetAt > Date.now() ? ` Remise à zéro des requêtes dans ${fmtWait(q.api.resetAt - Date.now())}.` : '';
-    src.textContent = q.api
-      ? `Selon ${P.name} (${plan}), ${relTime(q.api.at)}. L’audio est compté par Verbe sur 24 h.${reset}`
-      : `Estimé par Verbe : ce que cet appareil a envoyé sur les dernières 24 h, comparé au ${plan} de ${P.name}.${Desktop ? ' Le compte exact arrive avec ta prochaine dictée.' : ''}`;
+    /* La limite n'est pas remise à zéro à minuit : elle glisse sur les dernières 24 h (comme chez Groq).
+       On dit donc ce qui a été utilisé, et quand le temps revient, plutôt qu'un « par jour » trompeur. */
+    const usage = q.day.sec > 0
+      ? `Tu as utilisé ${fmtAudio(q.day.sec)} d’audio sur les dernières 24 h. Chaque dictée te revient 24 h plus tard, pas d’un coup à minuit.`
+      : 'Rien d’envoyé sur les dernières 24 h : tout ton temps est là.';
+    src.textContent = usage + (q.api ? ` Requêtes selon ${P.name} (${plan}), ${relTime(q.api.at)}.` : ` Estimé par Verbe, ${plan} de ${P.name}.`);
     let html = '<div class="quota">';
-    html += line(nf0.format(q.req.left), 'requêtes', q.req.left, q.req.limit, `sur ${nf0.format(q.req.limit)} par jour`);
-    html += line(fmtAudio(q.audio.left), 'd’audio', q.audio.left, q.audio.limit, `sur ${fmtAudio(q.audio.limit)} par jour`);
-    if (q.hourLeft < q.ash * 0.5) html += line(fmtAudio(q.hourLeft), 'cette heure-ci', q.hourLeft, q.ash, `sur ${fmtAudio(q.ash)} par heure`);
+    html += line(fmtAudio(q.audio.left), 'd’audio', q.audio.left, q.audio.limit, `sur ${fmtAudio(q.audio.limit)} en 24 h`);
+    html += line(nf0.format(q.req.left), 'requêtes', q.req.left, q.req.limit, `sur ${nf0.format(q.req.limit)} en 24 h`);
+    if (q.hourLeft < q.ash * 0.5) html += line(fmtAudio(q.hourLeft), 'cette heure-ci', q.hourLeft, q.ash, `sur ${fmtAudio(q.ash)} en 1 h`);
+    if (q.next) html += `<p class="qnext">${icon('clock', 16)}<span>Prochain retour : <b>+${fmtAudio(q.next.sec)}</b> ${fmtWhen(q.next.at)}</span></p>`;
     body.innerHTML = html + '</div>';
   },
   /* l'état de chaque section, lisible sans l'ouvrir */

@@ -39,9 +39,37 @@ test('quand les en-têtes de Groq sont lisibles (app bureau), ses chiffres passe
   await dicter(page, parLeMicroFlottant(page));
   await expect.poll(async () => (await lire(page)).corps).toMatch(/1 712 requêtes sur 2 000/);
   const q = await lire(page);
-  expect(q.source).toMatch(/Selon Groq \(forfait gratuit\)/);
-  expect(q.source).toMatch(/Remise à zéro des requêtes dans 3 h 1\d/);
+  expect(q.source).toMatch(/Requêtes selon Groq \(forfait gratuit\)/);
+  expect(q.source, 'plus de « remise à zéro » qui fait croire à un compteur du jour').not.toMatch(/Remise à zéro/);
   expect(q.pastille, 'rien sur Dicter tant qu’il en reste assez').not.toMatch(/restantes/);
+});
+
+test('la limite glisse sur 24 h : Verbe dit ce qui a été utilisé et quand le temps revient, jamais « par jour »', async ({ page }) => {
+  await ouvrir(page, {
+    hash: '#reglages/transcription',
+    avant: () => {
+      const maintenant = Date.now(), H = 3600000;
+      localStorage.setItem('verbe.usage', JSON.stringify([
+        [maintenant - 24 * H + 14 * 60000, 'groq', 30], // hier : revient dans 14 min
+        [maintenant - 6 * H, 'groq', 900],
+        [maintenant - 2 * H, 'groq', 990],
+      ]));
+    },
+  });
+  const q = await lire(page);
+  expect(q.source).toMatch(/Tu as utilisé 32 min d’audio sur les dernières 24 h\./);
+  expect(q.source).toMatch(/pas d’un coup à minuit/);
+  expect(q.corps).toMatch(/7 h 28 d’audio sur 8 h 00 en 24 h/);
+  expect(q.corps).toMatch(/Prochain retour : \+30 s dans 1[345] min/);
+  expect(q.corps).not.toMatch(/par jour/);
+});
+
+test('rien d’envoyé sur 24 h : tout le temps est là, pas de « prochain retour »', async ({ page }) => {
+  await ouvrir(page, { hash: '#reglages/transcription', avant: () => localStorage.setItem('verbe.usage', JSON.stringify([[Date.now() - 25 * 3600000, 'groq', 600]])) });
+  const q = await lire(page);
+  expect(q.source).toMatch(/Rien d’envoyé sur les dernières 24 h : tout ton temps est là\./);
+  expect(q.corps).toMatch(/8 h 00 d’audio sur 8 h 00 en 24 h/);
+  expect(q.corps).not.toMatch(/Prochain retour/);
 });
 
 test('sous 15 % d’audio, la pastille de Dicter prévient', async ({ page }) => {
